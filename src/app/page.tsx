@@ -8,6 +8,7 @@ import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import { CursteroidsGame } from "@/components/CursteroidsGame";
+import { ResumeFeedback } from "@/components/ResumeFeedback";
 import { ThemeModeToggle } from "@/components/ThemeModeToggle";
 import { DISTINCTIVE_BLOCKERS } from "@/game/blockers";
 import {
@@ -126,6 +127,9 @@ export default function Home() {
                 <Button variant="contained" href="#builder-challenge">
                   See the challenge
                 </Button>
+                <Button variant="outlined" href="#resume-feedback">
+                  Resume fit check
+                </Button>
                 <Button
                   variant="outlined"
                   href={CAREERS_URL}
@@ -224,6 +228,21 @@ export default function Home() {
               </Stack>
             </Grid>
           </Grid>
+
+          <Paper
+            id="resume-feedback"
+            elevation={0}
+            sx={{
+              p: { xs: 2.5, md: 3 },
+              borderRadius: 2,
+              border: 1,
+              borderColor: "divider",
+              background: "background.paper",
+              scrollMarginTop: 24,
+            }}
+          >
+            <ResumeFeedback />
+          </Paper>
 
           <Paper
             id="builder-challenge"

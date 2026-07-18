@@ -43,6 +43,15 @@ Open [http://localhost:3000](http://localhost:3000).
   - **Agent Mode** — steers assist toward the nearest hard blocker
 - Scorecard in [`src/game/scorecard.ts`](src/game/scorecard.ts) scores diagnosis, trust, systems, and tool use. Arcade skill is not the filter.
 
+### Resume fit check
+
+Candidates can upload a PDF/TXT resume (or paste text) at `#resume-feedback`. The API scores against the AI Adoption Engineer rubric in [`src/game/roles/ai-adoption-engineer.ts`](src/game/roles/ai-adoption-engineer.ts) and returns dimension scores, gaps, and next steps.
+
+- Endpoint: `POST /api/resume-feedback`
+- Requires `OPENAI_API_KEY` in the environment
+- Resumes are processed in memory and not stored
+- Feedback is advisory only — not an official hiring decision
+
 ### Loop B: Builder challenge (the filter)
 
 Fork Cursteroids and make **one** adoption blocker more interesting — as a mechanic or a teaching moment. Open a PR, or record a short Loom plus a written note on why this helps a team adopt Cursor.
