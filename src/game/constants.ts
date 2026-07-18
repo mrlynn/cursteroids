@@ -21,7 +21,7 @@ export const REGEN_WINDOW = 2.4;
 export const DRAIN_RADIUS = 110;
 export const DRAIN_PER_SECOND = 18;
 export const NEAR_MISS_GAP = 28;
-export const CAREERS_URL = "https://cursor.com/careers";
+export const CAREERS_URL = "https://cursor.com/careers/ai-adoption-engineer";
 export const REPO_URL = "https://github.com/mrlynn/cursteroids";
 export const APPLY_WITH_CHALLENGE_HINT =
   "Include your Cursteroids PR or Loom link in the application.";

@@ -30,9 +30,9 @@ Do **not** rank candidates by Impact score, accuracy, or archetype headline from
 
 ## Apply path
 
-Candidates should apply via [cursor.com/careers](https://cursor.com/careers) and include their Cursteroids PR or Loom link in the application.
+Candidates should apply via [AI Adoption Engineer](https://cursor.com/careers/ai-adoption-engineer) and include their Cursteroids PR or Loom link in the application.
 
-If a dedicated AI Adoption Engineer posting URL is available, update `CAREERS_URL` in [`src/game/constants.ts`](src/game/constants.ts).
+Role URL is centralized as `CAREERS_URL` in [`src/game/constants.ts`](src/game/constants.ts).
 
 ## Red flags
 

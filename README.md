@@ -47,7 +47,7 @@ Open [http://localhost:3000](http://localhost:3000).
 
 Fork Cursteroids and make **one** adoption blocker more interesting — as a mechanic or a teaching moment. Open a PR, or record a short Loom plus a written note on why this helps a team adopt Cursor.
 
-Then apply at [cursor.com/careers](https://cursor.com/careers) and include your PR or Loom link.
+Then apply at [AI Adoption Engineer](https://cursor.com/careers/ai-adoption-engineer) and include your PR or Loom link.
 
 ### Rubric
 
