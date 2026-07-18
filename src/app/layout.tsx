@@ -14,8 +14,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Cursteroids",
-  description: "A light-mode Cursor-branded Asteroids clone.",
+  title: "Cursteroids | AI Adoption Engineer Simulator",
+  description:
+    "Play a four-phase AI adoption mission, then prove your fit: fork Cursteroids and improve one blocker.",
 };
 
 export default function RootLayout({
