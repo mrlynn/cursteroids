@@ -58,7 +58,22 @@ export type ActiveEffects = {
   agentUntil: number;
 };
 
-export type GameStatus = "ready" | "playing" | "paused" | "gameOver" | "missionComplete";
+export type GameStatus =
+  | "ready"
+  | "playing"
+  | "paused"
+  | "debriefing"
+  | "gameOver"
+  | "missionComplete";
+
+export type PhaseDebriefRecord = {
+  phase: number;
+  phaseLabel: string;
+  strugglingMoment: string;
+  intervention: string;
+  leaveBehind: string;
+  note?: string;
+};
 
 export type GameState = {
   width: number;
@@ -88,6 +103,9 @@ export type GameState = {
   snapshotTimer: number;
   toast: string | null;
   toastUntil: number;
+  debriefs: PhaseDebriefRecord[];
+  debriefPhase: number;
+  pendingMissionComplete: boolean;
 };
 
 export type GameSnapshot = {
@@ -104,6 +122,8 @@ export type GameSnapshot = {
   powerupsUsedWell: number;
   activePowerup: string | null;
   toast: string | null;
+  debriefs: PhaseDebriefRecord[];
+  debriefPhase: number;
 };
 
 export type AdoptionBlocker = {

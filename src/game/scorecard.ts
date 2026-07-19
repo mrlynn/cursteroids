@@ -1,4 +1,5 @@
 import { CAMPAIGN_PHASES } from "@/game/constants";
+import { formatDebriefsForShare } from "@/game/dialogue";
 import type { GameSnapshot } from "@/game/types";
 
 export type ScoreDimension = {
@@ -14,6 +15,7 @@ export type RecruitingScorecard = {
   dimensions: ScoreDimension[];
   shareText: string;
   completedMission: boolean;
+  debriefs: GameSnapshot["debriefs"];
 };
 
 function clampScore(value: number) {
@@ -43,7 +45,8 @@ function systemsScore(snapshot: GameSnapshot) {
   const phasePoints = Math.min(CAMPAIGN_PHASES, snapshot.level) * 18;
   const completeBonus = snapshot.status === "missionComplete" ? 28 : 0;
   const progressBonus = snapshot.level > 1 ? 10 : 0;
-  return clampScore(phasePoints + completeBonus + progressBonus);
+  const debriefBonus = Math.min(24, snapshot.debriefs.length * 6);
+  return clampScore(phasePoints + completeBonus + progressBonus + debriefBonus);
 }
 
 function toolsScore(snapshot: GameSnapshot) {
@@ -137,10 +140,12 @@ export function buildScorecard(snapshot: GameSnapshot, origin = ""): RecruitingS
   const headline = headlineFor(dimensions, completedMission);
   const summary = summaryFor(dimensions, completedMission);
   const dimLine = dimensions.map((d) => `${d.label} ${d.score}`).join(" · ");
+  const debriefLines = formatDebriefsForShare(snapshot.debriefs);
   const shareText = [
     `Cursteroids — AI Adoption Engineer simulator`,
     `${headline}`,
     `Impact ${snapshot.score} · Phase ${Math.min(snapshot.level, CAMPAIGN_PHASES)}/${CAMPAIGN_PHASES} · ${dimLine}`,
+    debriefLines ? `Retros:\n${debriefLines}` : "",
     `Builder challenge: fork and improve one blocker.`,
     origin || (typeof window !== "undefined" ? window.location.href : ""),
   ]
@@ -153,5 +158,6 @@ export function buildScorecard(snapshot: GameSnapshot, origin = ""): RecruitingS
     dimensions,
     shareText,
     completedMission,
+    debriefs: snapshot.debriefs,
   };
 }

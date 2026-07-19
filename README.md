@@ -30,6 +30,11 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## Play → Prove
 
+### Account desk + phase retros
+
+- **Account desk** (`#account-desk`): a short scripted ADM huddle that teaches intervention judgment before or beside the game.
+- **Phase retros**: after each cleared phase, candidates answer three role questions (struggling moment, intervention, leave-behind). Answers appear on the scorecard and in share text.
+
 ### Loop A: Play (job preview)
 
 - Four campaign phases; clear Phase 4 to complete the mission

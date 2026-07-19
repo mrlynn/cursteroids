@@ -7,6 +7,7 @@ import Grid from "@mui/material/Grid";
 import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
+import { AccountDesk } from "@/components/AccountDesk";
 import { CursteroidsGame } from "@/components/CursteroidsGame";
 import { ResumeFeedback } from "@/components/ResumeFeedback";
 import { ThemeModeToggle } from "@/components/ThemeModeToggle";
@@ -119,16 +120,22 @@ export default function Home() {
                 Can you clear the blockers to AI adoption?
               </Typography>
               <Typography color="text.secondary" sx={{ maxWidth: 820 }}>
-                Play a four-phase job preview: diagnose friction, use Cursor-shaped powerups,
-                protect trust, and finish the mission. The hiring signal is not your high score —
-                it is the builder challenge below.
+                Talk through a stalled account at the desk, play a four-phase mission with phase
+                retros, then prove fit with the builder challenge. The hiring signal is not your
+                high score.
               </Typography>
               <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
-                <Button variant="contained" href="#builder-challenge">
-                  See the challenge
+                <Button variant="contained" href="#account-desk">
+                  Account desk
+                </Button>
+                <Button variant="outlined" href="#game">
+                  Play the mission
                 </Button>
                 <Button variant="outlined" href="#resume-feedback">
                   Resume fit check
+                </Button>
+                <Button variant="outlined" href="#builder-challenge">
+                  See the challenge
                 </Button>
                 <Button
                   variant="outlined"
@@ -157,6 +164,22 @@ export default function Home() {
 
             <Grid size={{ xs: 12, lg: 3 }}>
               <Stack spacing={2} sx={{ height: "100%" }}>
+                <Paper
+                  id="account-desk"
+                  elevation={0}
+                  sx={{
+                    p: 3,
+                    borderRadius: 2,
+                    border: 1,
+                    borderColor: "divider",
+                    background: "background.paper",
+                    scrollMarginTop: 24,
+                    flexGrow: 1,
+                  }}
+                >
+                  <AccountDesk />
+                </Paper>
+
                 <Paper
                   elevation={0}
                   sx={{
@@ -190,7 +213,6 @@ export default function Home() {
                     border: 1,
                     borderColor: "divider",
                     background: "background.paper",
-                    flexGrow: 1,
                   }}
                 >
                   <Stack spacing={1.25}>

@@ -1,5 +1,5 @@
 import { getBlocker, getBlockerByLabel, hitPointsForMechanic } from "@/game/blockers";
-import { waveBriefForLevel, isFinalPhase } from "@/game/campaign";
+import { isFinalPhase, WAVE_BRIEFS, waveBriefForLevel } from "@/game/campaign";
 import {
   BULLET_LIFE,
   BULLET_SPEED,
@@ -37,6 +37,7 @@ import type {
   Bullet,
   GameSnapshot,
   GameState,
+  PhaseDebriefRecord,
   Ship,
   Vector,
 } from "@/game/types";
@@ -150,6 +151,9 @@ export function createInitialGame(): GameState {
     snapshotTimer: 0,
     toast: null,
     toastUntil: 0,
+    debriefs: [],
+    debriefPhase: 0,
+    pendingMissionComplete: false,
   };
 }
 
@@ -168,6 +172,8 @@ export function getSnapshot(game: GameState, now = 0): GameSnapshot {
     powerupsUsedWell: game.powerupsUsedWell,
     activePowerup: activePowerupLabel(game.effects, now),
     toast: now < game.toastUntil ? game.toast : null,
+    debriefs: [...game.debriefs],
+    debriefPhase: game.debriefPhase,
   };
 }
 
@@ -573,19 +579,33 @@ export function updatePlaying(game: GameState, delta: number, now: number) {
   }
 
   if (game.status === "playing" && game.asteroids.length === 0) {
-    if (isFinalPhase(game.level)) {
-      game.status = "missionComplete";
-      game.toast = "Mission complete. Prove it in the builder challenge.";
-      game.toastUntil = now + 4;
-      return;
-    }
-
-    game.level += 1;
-    resetShip(game, now);
-    spawnWave(game);
-    game.toast = waveBriefForLevel(game.level);
-    game.toastUntil = now + 2.2;
+    game.bullets = [];
+    game.powerups = [];
+    game.debriefPhase = game.level;
+    game.pendingMissionComplete = isFinalPhase(game.level);
+    game.status = "debriefing";
+    game.toast = "Phase clear — quick retro before you continue.";
+    game.toastUntil = now + 2.5;
   }
+}
+
+export function completeDebrief(game: GameState, debrief: PhaseDebriefRecord, now: number) {
+  game.debriefs = [...game.debriefs.filter((item) => item.phase !== debrief.phase), debrief];
+
+  if (game.pendingMissionComplete) {
+    game.pendingMissionComplete = false;
+    game.status = "missionComplete";
+    game.toast = "Mission complete. Prove it in the builder challenge.";
+    game.toastUntil = now + 4;
+    return;
+  }
+
+  game.level += 1;
+  game.status = "playing";
+  resetShip(game, now);
+  spawnWave(game);
+  game.toast = waveBriefForLevel(game.level);
+  game.toastUntil = now + 2.2;
 }
 
 export function updateParticles(game: GameState, delta: number) {
@@ -922,17 +942,21 @@ function drawOverlay(ctx: CanvasRenderingContext2D, game: GameState) {
       ? "Clear AI adoption blockers"
       : game.status === "paused"
         ? "Paused"
-        : game.status === "missionComplete"
-          ? "Mission complete"
-          : "Run ended";
+        : game.status === "debriefing"
+          ? "Phase retro"
+          : game.status === "missionComplete"
+            ? "Mission complete"
+            : "Run ended";
   const subtitle =
     game.status === "ready"
       ? "Four phases. Real powerups. Then prove it in the builder challenge."
       : game.status === "paused"
         ? "Press P or Resume to continue."
-        : game.status === "missionComplete"
-          ? "Fork one blocker and show how you would help a team adopt Cursor."
-          : "Review your scorecard, then take the builder challenge.";
+        : game.status === "debriefing"
+          ? `Phase ${game.debriefPhase}: ${WAVE_BRIEFS[Math.max(0, game.debriefPhase - 1)] ?? "Reflect"} — answer below to continue.`
+          : game.status === "missionComplete"
+            ? "Fork one blocker and show how you would help a team adopt Cursor."
+            : "Review your scorecard, then take the builder challenge.";
 
   ctx.save();
   ctx.fillStyle = palette.overlay;
@@ -996,6 +1020,9 @@ export function startMission(game: GameState, now: number) {
   game.powerups = [];
   game.effects = emptyEffects();
   game.keys.clear();
+  game.debriefs = [];
+  game.debriefPhase = 0;
+  game.pendingMissionComplete = false;
   game.toast = waveBriefForLevel(1);
   game.toastUntil = now + 2.4;
   resetShip(game, now);

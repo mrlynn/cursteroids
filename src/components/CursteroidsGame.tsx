@@ -13,6 +13,7 @@ import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import { useTheme } from "@mui/material/styles";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { PhaseDebriefPanel } from "@/components/PhaseDebrief";
 import { phaseLabel } from "@/game/campaign";
 import { CHALLENGE_BRIEF, REPO_URL } from "@/game/challenge";
 import {
@@ -21,7 +22,9 @@ import {
   CAMPAIGN_PHASES,
   INITIAL_LIVES,
 } from "@/game/constants";
+import type { PhaseDebrief } from "@/game/dialogue";
 import {
+  completeDebrief,
   createInitialGame,
   drawGame,
   getPalette,
@@ -51,6 +54,8 @@ function emptySnapshot(): GameSnapshot {
     powerupsUsedWell: 0,
     activePowerup: null,
     toast: null,
+    debriefs: [],
+    debriefPhase: 0,
   };
 }
 
@@ -84,9 +89,18 @@ export function CursteroidsGame() {
     syncSnapshot();
   }, [syncSnapshot]);
 
+  const onDebriefComplete = useCallback(
+    (debrief: PhaseDebrief) => {
+      completeDebrief(gameRef.current, debrief, performance.now() / 1000);
+      syncSnapshot();
+    },
+    [syncSnapshot],
+  );
+
   const scorecard = buildScorecard(snapshot);
   const showScorecard =
     snapshot.status === "gameOver" || snapshot.status === "missionComplete";
+  const showDebrief = snapshot.status === "debriefing";
 
   const copyShareText = useCallback(async () => {
     await navigator.clipboard.writeText(scorecard.shareText);
@@ -139,12 +153,20 @@ export function CursteroidsGame() {
 
       const game = gameRef.current;
 
+      if (game.status === "debriefing") {
+        return;
+      }
+
       if (event.code === "KeyP") {
         togglePause();
         return;
       }
 
-      if (event.code === "Enter" && game.status !== "playing") {
+      if (
+        event.code === "Enter" &&
+        game.status !== "playing" &&
+        game.status !== "paused"
+      ) {
         startGame();
         return;
       }
@@ -214,12 +236,14 @@ export function CursteroidsGame() {
 
   return (
     <Card
+      id="game"
       component="section"
       sx={{
         p: { xs: 1, md: 1.25 },
         borderRadius: 2,
         overflow: "hidden",
         background: "background.paper",
+        scrollMarginTop: 24,
       }}
     >
       <Stack spacing={2}>
@@ -287,6 +311,13 @@ export function CursteroidsGame() {
           />
         </Box>
 
+        {showDebrief ? (
+          <PhaseDebriefPanel
+            phase={snapshot.debriefPhase || snapshot.level}
+            onComplete={onDebriefComplete}
+          />
+        ) : null}
+
         {showScorecard ? (
           <Card
             variant="outlined"
@@ -348,6 +379,21 @@ export function CursteroidsGame() {
                   </Stack>
                 ))}
               </Stack>
+
+              {scorecard.debriefs.length > 0 ? (
+                <Stack spacing={1}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+                    Your phase retros
+                  </Typography>
+                  {scorecard.debriefs.map((debrief) => (
+                    <Typography key={debrief.phase} variant="body2" color="text.secondary">
+                      Phase {debrief.phase} · {debrief.intervention}. Leave behind:{" "}
+                      {debrief.leaveBehind}
+                      {debrief.note ? ` (${debrief.note})` : ""}
+                    </Typography>
+                  ))}
+                </Stack>
+              ) : null}
 
               <Divider />
               <Typography color="text.secondary" variant="body2">
