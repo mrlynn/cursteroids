@@ -17,7 +17,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   // Includes the multi-zone base path: file-convention OG image URLs compose
   // from metadataBase without the basePath prefix, so it must live here.
-  metadataBase: new URL("https://mlynn.org/cursteroids"),
+  // www is the canonical host — the apex 308s to it, and unfurl crawlers
+  // shouldn't have to follow a redirect to fetch the OG image.
+  metadataBase: new URL("https://www.mlynn.org/cursteroids"),
   title: "Cursteroids — the job description you can play",
   description:
     "Cursor is hiring an AI Adoption Engineer. Play the job: clear adoption blockers, accept Tab suggestions, deploy agents on the toil, keep Trust alive. Then prove it with a real artifact.",
