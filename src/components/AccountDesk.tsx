@@ -53,8 +53,8 @@ export function AccountDesk() {
           <Chip size="small" label={progressLabel} variant="outlined" />
         </Stack>
         <Typography color="text.secondary" variant="body2">
-          A short ADM huddle. Pick the intervention you would run — the coach answers like a
-          senior on the Customer Education team.
+          A short ADM huddle. Pick the artifact you would ship — the coach answers like a senior
+          on the Customer Education team.
         </Typography>
       </Stack>
 
@@ -126,9 +126,9 @@ export function AccountDesk() {
             Huddle complete
           </Typography>
           <Typography color="text.secondary" variant="body2">
-            Notice the pattern: diagnose the account, pick an intervention that fits the
-            constraint, protect Trust, and leave something repeatable. That is the AI Adoption
-            Engineer job in miniature.
+            Notice the pattern: diagnose the org, ship an artifact that fits the constraint, build
+            with the team, measure the change, and leave something the next squad can start from.
+            That is the AI Adoption Engineer job in miniature.
           </Typography>
           <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
             <Button size="small" variant="contained" href="#game">

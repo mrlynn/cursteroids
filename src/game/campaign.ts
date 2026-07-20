@@ -1,10 +1,10 @@
 import { CAMPAIGN_PHASES } from "@/game/constants";
 
 export const WAVE_BRIEFS = [
-  "Diagnose adoption friction",
-  "Design the workflow system",
-  "Enable teams with proof",
-  "Measure trust and scale",
+  "Diagnose — read the engineering org",
+  "Design — build the intervention",
+  "Enable — ship it with the team",
+  "Measure & Scale — prove and systematize",
 ] as const;
 
 export function waveBriefForLevel(level: number) {

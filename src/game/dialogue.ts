@@ -23,32 +23,32 @@ export function debriefQuestionsForPhase(phase: number): DebriefQuestion[] {
       return [
         {
           id: "strugglingMoment",
-          prompt: `${brief}: What friction showed up first?`,
+          prompt: `${brief}: Where is capability furthest from practice?`,
           options: [
-            "Skeptical seniors who do not trust AI output",
-            "No shared definition of good prompts / workflows",
+            "Seniors distrust AI output; no review loop",
+            "Every squad invents its own Cursor setup",
+            "Agent Mode blocked; Tab-only with no path forward",
             "Leadership wants ROI before anyone changes habits",
-            "Tool sprawl — everyone inventing their own Cursor setup",
           ],
         },
         {
           id: "intervention",
-          prompt: "What intervention fits this room?",
+          prompt: "What do you design first?",
           options: [
-            "Live hackathon with a real backlog ticket",
-            "Structured workshop with a clear before/after",
-            "Champion 1:1s before any big event",
-            "Ship a playbook first, then gather the room",
+            "Repo-specific Rules library with the platform team",
+            "Prompt architecture for their top incident / PR workflow",
+            "MCP into their knowledge base or JIRA",
+            "Adoption dashboard baseline with the eng manager",
           ],
         },
         {
           id: "leaveBehind",
-          prompt: "What should still work after you leave?",
+          prompt: "What should the next team start from — not scratch?",
           options: [
-            "A named champion + office hours cadence",
-            "An eval / review loop for AI-assisted PRs",
-            "A one-page workflow playbook for the team",
-            "A baseline metric the VP can track weekly",
+            "Checked-in .cursorrules + example PR",
+            "Prompt framework in their vocabulary",
+            "MCP config + short ownership doc",
+            "One metric the VP can track weekly",
           ],
         },
       ];
@@ -56,32 +56,32 @@ export function debriefQuestionsForPhase(phase: number): DebriefQuestion[] {
       return [
         {
           id: "strugglingMoment",
-          prompt: `${brief}: Where does the design usually fail?`,
+          prompt: `${brief}: What makes a generic best-practices doc fail here?`,
           options: [
-            "Great demo, zero habit change the next Monday",
-            "Rules / prompts exist but nobody owns them",
-            "Security blocks Agent Mode without a path forward",
-            "Each squad invents a different workflow",
+            "Their monorepo conventions are unique",
+            "Security needs allowlists before Agent Mode",
+            "On-call handoffs are the real pain, not demos",
+            "No owner for any AI-assisted workflow",
           ],
         },
         {
           id: "intervention",
-          prompt: "How do you make the workflow durable?",
+          prompt: "How do you close the gap in their codebase?",
           options: [
-            "Codify Rules + review checklist with the team",
-            "Pair on one production path until it sticks",
-            "Design a Customer Developer Day around their repo",
-            "Build a tiny eval harness before scaling demos",
+            "Pair-draft Rules against real PRs",
+            "Build a Cloud Agent for dependency audits",
+            "Write a workflow guide for sprint kickoff + refactor",
+            "Stand up MCP to monitoring / internal APIs",
           ],
         },
         {
           id: "leaveBehind",
-          prompt: "What artifact proves the system, not the session?",
+          prompt: "What artifact proves the design, not the session?",
           options: [
-            "Team Rules file + example PR",
-            "Judging rubric for hackathon outcomes",
-            "Agenda + retro template others can rerun",
-            "Champion kit: talk track, FAQ, escalation path",
+            "Rules + review checklist the team edits",
+            "Cloud Agent running with a handoff doc",
+            "Workflow guide reproducible without you",
+            "Prompt pack for incident investigation",
           ],
         },
       ];
@@ -89,32 +89,32 @@ export function debriefQuestionsForPhase(phase: number): DebriefQuestion[] {
       return [
         {
           id: "strugglingMoment",
-          prompt: `${brief}: What burns Trust in the room?`,
+          prompt: `${brief}: What burns Trust when you enable badly?`,
           options: [
-            "Overclaiming what Agent Mode can do live",
-            "Ignoring the skeptic who asks about review",
-            "Optimizing for applause instead of a shipped change",
-            "Leaving without a next practice date",
+            "Building in front of them instead of with them",
+            "Overclaiming Agent Mode live",
+            "Leaving without a named owner for the artifact",
+            "No practice date after the working session",
           ],
         },
         {
           id: "intervention",
-          prompt: "How do you enable without becoming the hero?",
+          prompt: "How do you ship so they own it?",
           options: [
-            "Have a customer eng drive the laptop",
-            "Time-box demos; spend the rest on their ticket",
-            "Coach champions to run the next session",
-            "Capture the win as a story ADM/CS can reuse",
+            "Customer eng drives; you navigate",
+            "Working session ends with merged Rules PR",
+            "Champion runs the next office hours using your guide",
+            "Enablement guide for managers of the next squad",
           ],
         },
         {
           id: "leaveBehind",
-          prompt: "What evidence shows behavior started to change?",
+          prompt: "What evidence shows practice started?",
           options: [
-            "Merged PR that used the new workflow",
-            "Two champions scheduled to run office hours",
-            "Team agreed eval criteria for AI-assisted work",
-            "VP saw a before/after on a real metric",
+            "Merged PR using the new workflow",
+            "Two squads using the same Rules base",
+            "Agent request volume moved on the dashboard",
+            "Manager scheduled rollout using your enablement guide",
           ],
         },
       ];
@@ -123,32 +123,32 @@ export function debriefQuestionsForPhase(phase: number): DebriefQuestion[] {
       return [
         {
           id: "strugglingMoment",
-          prompt: `${brief}: What usually dies at scale?`,
+          prompt: `${brief}: What dies when you only help one team?`,
           options: [
-            "One team wins; neighboring teams never hear",
-            "No owner for the playbook after the event",
+            "Neighboring teams never see the artifact",
             "Metrics never leave the slide deck",
-            "Content ships but nobody practices",
+            "No owner after you rotate off",
+            "Learnings never reach Cursor's playbook",
           ],
         },
         {
           id: "intervention",
-          prompt: "How do you scale without watering it down?",
+          prompt: "How do you turn the win into a system?",
           options: [
-            "Turn the win into a repeatable Customer Developer Day",
-            "Feed patterns back to Customer Education curriculum",
-            "Train champions to facilitate, not just use Cursor",
-            "Set a weekly adoption pulse with ADM/CS",
+            "Package Rules + MCP + guide for the next squad",
+            "Adoption dashboard in the QBR with ADM/CS",
+            "Feed the pattern into Customer Education curriculum",
+            "Train champions to extend the artifact, not just use it",
           ],
         },
         {
           id: "leaveBehind",
-          prompt: "What makes this an adoption program, not an event?",
+          prompt: "What makes this permanent practice?",
           options: [
-            "Cadence on the calendar for the next 30 days",
-            "Shared metrics dashboard the account can own",
-            "Playbook + rubric checked into their docs",
-            "A named internal owner with ADM backup",
+            "Cadence + owner for the next 30 days",
+            "Shared metrics the account can run without you",
+            "Artifact pack checked into their docs repo",
+            "Playbook update Cursor can reuse on the next account",
           ],
         },
       ];
@@ -169,41 +169,41 @@ export type DeskTurn = {
   choices: DeskChoice[];
 };
 
-/** Scripted Account Desk — simulated ADM huddle about a stalled rollout. */
+/** Scripted Account Desk — artifact decisions for a stalled enterprise rollout. */
 export const ACCOUNT_DESK_TURNS: DeskTurn[] = [
   {
     id: "stalled-pilot",
     from: "ADM",
     message:
-      "Pilot looked good two weeks ago. Usage flatlined. Platform eng says demos feel like theater. What do you run?",
+      "Pilot looked good two weeks ago. Usage flatlined. Platform eng says demos feel like theater. What do you ship first?",
     choices: [
       {
-        id: "hackathon",
-        label: "Internal hackathon on a real backlog ticket",
+        id: "rules",
+        label: "Draft a repo-specific Rules library with the platform team",
         coach:
-          "Solid if you can get a real ticket and a judging bar. Events are a mechanism — pick one outcome that proves habit change.",
-        teach: "AAEs design experiential interventions, not slide decks.",
+          "Strong open. Credibility comes from what you build in their conventions, not another demo. Make them co-authors of the Rules PR.",
+        teach: "Rules libraries encode team standards so adoption sticks beyond the room.",
       },
       {
-        id: "workshop",
-        label: "Structured half-day workshop with before/after",
+        id: "mcp",
+        label: "Stand up an MCP to their knowledge base or JIRA",
         coach:
-          "Good when the team needs a shared workflow more than adrenaline. Make the before/after observable or it dies Monday.",
-        teach: "Workshops win when the struggling moment is skill + process, not motivation.",
+          "Good when the gap is context, not motivation. An assistant that knows the business beats a generic chat.",
+        teach: "MCP turns Cursor from a coding toy into a system that sees their world.",
       },
       {
-        id: "champions",
-        label: "Champion 1:1s before any big event",
+        id: "cloud-agent",
+        label: "Ship a Cloud Agent for dependency audits on a real repo",
         coach:
-          "Often the right first move with skeptics. Build internal credibility, then let champions fill the room.",
-        teach: "Trust is rebuilt in layers. Champions are how adoption survives after you leave.",
+          "Works if you hand it off documented and running. Automation they own beats a heroic session.",
+        teach: "Cloud Agent workflows are permanent practice when the team keeps them alive.",
       },
       {
-        id: "content",
-        label: "Send a tighter enablement pack and check usage",
+        id: "dashboard",
+        label: "Build an adoption dashboard baseline with the eng manager",
         coach:
-          "Weak default. Content without a live practice loop rarely moves a stalled pilot. Use content to support an intervention, not replace it.",
-        teach: "Behavior change is the goal. Content is infrastructure for practice.",
+          "Right when leadership is flying blind. Measure depth before you scale theater.",
+        teach: "Dashboards make the story data, not sentiment.",
       },
     ],
   },
@@ -211,35 +211,35 @@ export const ACCOUNT_DESK_TURNS: DeskTurn[] = [
     id: "vp-roi",
     from: "ADM",
     message:
-      "VP Eng wants an ROI story by Friday. They will sit in for 20 minutes. How do you spend that time?",
+      "VP Eng wants proof by Friday. They will sit for 20 minutes. How do you spend that time?",
     choices: [
       {
         id: "metric",
-        label: "Show one baseline → one improved workflow metric",
+        label: "Show baseline → improved metric from the dashboard",
         coach:
-          "Best move if you already instrumented something. Vague velocity claims burn Trust with VPs.",
-        teach: "Unclear ROI drains the narrative. Measure or lose the room.",
+          "Best if you already instrumented something real. Vague velocity claims burn Trust.",
+        teach: "Measure proves the change. Leadership stories need numbers.",
       },
       {
-        id: "live-pr",
-        label: "Live-resolve a skeptical eng's open PR with Cursor",
+        id: "rules-pr",
+        label: "Walk a merged Rules PR the team already owns",
         coach:
-          "High Trust if it works; high risk if you overclaim. Have a review loop ready when they ask about quality.",
-        teach: "Credibility is earned in the codebase, not the slide.",
+          "High credibility. You are showing permanent practice, not a slide.",
+        teach: "Ship alongside the team — then show what they kept.",
       },
       {
-        id: "roadmap",
-        label: "Present a 30-day adoption program plan",
+        id: "live-build",
+        label: "Live-build a prompt architecture on their open incident",
         coach:
-          "Works when they need a system, not a miracle. Tie each week to an owner and a behavior, not event count.",
-        teach: "Programs beat one-off wins. Cadence is the product.",
+          "High Trust if a customer eng drives. Overclaiming Agent Mode live is how you lose the room.",
+        teach: "Enable means build with them, not perform in front of them.",
       },
       {
-        id: "defer",
-        label: "Ask for two more weeks before any executive readout",
+        id: "deck",
+        label: "Present a polished enablement deck and roadmap",
         coach:
-          "Sometimes honest. Only if you name what you will prove in those two weeks. Silence looks like stall.",
-        teach: "Operate inside the account relationship — do not surprise CS/ADM with a no-show.",
+          "Weak default for this role. Decks without artifacts read as consulting theater.",
+        teach: "Credibility comes from what you ship, not what you present.",
       },
     ],
   },
@@ -247,35 +247,35 @@ export const ACCOUNT_DESK_TURNS: DeskTurn[] = [
     id: "security-block",
     from: "ADM",
     message:
-      "Security paused Agent Mode. Devs still have Tab. Half the room checked out. Next move?",
+      "Security paused Agent Mode. Devs still have Tab. Half the room checked out. Next artifact?",
     choices: [
       {
-        id: "rules-path",
-        label: "Facilitate a Rules + allowlist workshop with Security",
+        id: "rules-allowlist",
+        label: "Co-design Rules + allowlist path with Security",
         coach:
-          "Turns the block into a co-design session. You are building constraint clarity, not fighting the gate.",
-        teach: "Rules encode guardrails so teams stop renegotiating every prompt.",
+          "Turns the block into a control you build together. Constraint clarity beats waiting.",
+        teach: "Design the intervention for the real constraint, not the fantasy stack.",
       },
       {
-        id: "tab-depth",
-        label: "Double down on Tab workflows until Agent is unblocked",
+        id: "workflow-tab",
+        label: "Ship a Tab-first workflow guide for on-call handoffs",
         coach:
-          "Pragmatic. Keep momentum where policy allows, and document the Agent path for when it opens.",
-        teach: "Right intervention for the constraint — not the fantasy stack.",
+          "Pragmatic. Keep practice alive where policy allows; document the Agent path for later.",
+        teach: "Workflow guides make thinner practice loops reproducible.",
       },
       {
-        id: "escalate",
-        label: "Escalate to unblock Agent Mode this week",
+        id: "mcp-safe",
+        label: "MCP only to approved internal read-only systems",
         coach:
-          "Only if Safety risk is overstated and ADM agrees. Escalation without a proposed control set burns political capital.",
-        teach: "Post-sales work means protecting the account relationship while pushing adoption.",
+          "Smart compromise when context is the pain and Agent is blocked.",
+        teach: "MCP configurations can expand value inside the policy envelope.",
       },
       {
         id: "pause",
-        label: "Pause enablement until Agent Mode returns",
+        label: "Pause all enablement until Agent Mode returns",
         coach:
-          "Usually wrong. Adoption dies in vacuums. Keep a thinner practice loop alive.",
-        teach: "Success is whether developers change how they build — even under constraint.",
+          "Usually wrong. Adoption dies in vacuums. Leave a thinner artifact loop running.",
+        teach: "Permanent practice beats waiting for the perfect tool state.",
       },
     ],
   },
@@ -286,32 +286,32 @@ export const ACCOUNT_DESK_TURNS: DeskTurn[] = [
       "One squad is crushing it. Three neighboring teams have not started. What do you leave behind?",
     choices: [
       {
-        id: "dev-day",
-        label: "Customer Developer Day the winning squad helps facilitate",
+        id: "artifact-pack",
+        label: "Package Rules + MCP + enablement guide for the next squad",
         coach:
-          "Strong scale move. The win becomes a program other teams can enter, not a legend they hear about.",
-        teach: "Build facilitation infrastructure others can rerun.",
+          "Strong scale move. The next team starts from your work, not from scratch.",
+        teach: "Scale means systems other teams can replicate.",
       },
       {
         id: "feed-edu",
-        label: "Write the pattern back into Customer Education curriculum",
+        label: "Feed the pattern into Customer Education curriculum",
         coach:
-          "Right long game. Your field signal should change how the broader education team designs content.",
-        teach: "AAEs identify patterns across engagements and feed the system.",
+          "Right long game. Field signal should change how Cursor designs programs.",
+        teach: "The best practitioners help every team that comes after them.",
       },
       {
-        id: "champions-network",
-        label: "Stand up a cross-team champion guild with office hours",
+        id: "dashboard-qbr",
+        label: "Put adoption depth on the QBR dashboard with ADM/CS",
         coach:
-          "Scales trust sideways. Needs a light operating rhythm or it becomes Slack noise.",
-        teach: "Champions are how enablement survives without you in the room.",
+          "Makes expansion a data conversation, not cheerleading.",
+        teach: "Measure at team level so scale decisions are grounded.",
       },
       {
         id: "more-demos",
         label: "Book demos for each remaining team this month",
         coach:
-          "Activity trap. Demos without owners and practice loops recreate the stalled pilot.",
-        teach: "Events are a mechanism. Behavior change is the goal.",
+          "Activity trap. Demos without owned artifacts recreate the stalled pilot.",
+        teach: "Events are optional. Artifacts and habits are the job.",
       },
     ],
   },
@@ -322,9 +322,13 @@ export function formatDebriefsForShare(debriefs: PhaseDebrief[]): string {
     return "";
   }
   return debriefs
-    .map(
-      (d) =>
-        `Phase ${d.phase}: ${d.intervention} · leave behind: ${d.leaveBehind}`,
-    )
+    .map((d) => `Phase ${d.phase}: ${d.intervention} · leave behind: ${d.leaveBehind}`)
     .join("\n");
+}
+
+export function topArtifactFromDebriefs(debriefs: PhaseDebrief[]): string | null {
+  if (debriefs.length === 0) {
+    return null;
+  }
+  return debriefs[debriefs.length - 1]?.leaveBehind ?? null;
 }

@@ -1,17 +1,38 @@
 # Cursteroids
 
-Cursteroids is a playable recruiting microsite for the **AI Adoption Engineer** role at Cursor.
+**The job description you can play.**
 
-You pilot the Cursor logo through a four-phase Asteroids-style mission. Every asteroid is an adoption blocker. Some blockers have real mechanics. Powerups map to Cursor workflows. Clearing the campaign is the job preview.
+Cursteroids is a playable recruiting microsite for the **AI Adoption Engineer** role at Cursor. Instead of reading about the job, you play it: every mechanic is a Cursor product concept or a role judgment call.
 
-The hiring signal is not your high score. It is the **builder challenge**.
+Credibility comes from what you ship alongside the team, not from what you present to them.
 
 ## Why it exists
 
-The best AI Adoption Engineers are builders who can make abstract workflow change feel concrete. Cursteroids is a lightweight way to:
+AI Adoption Engineers turn AI pilots into permanent practice inside enterprise eng orgs. They ship Rules libraries, prompt architectures, MCP configs, dashboards, Cloud Agent workflows, and enablement guides — then leave systems the next team can start from.
 
-1. **Play** — feel the role loop (Diagnose → Design → Enable → Measure/Scale)
-2. **Prove** — fork the game and improve one blocker as a mechanic or teaching moment
+Cursteroids gives candidates a commitment ladder:
+
+1. **Play** — a 90-second mission where the mechanics teach the role (see below)
+2. **Judge** — Account Desk artifact decisions and phase retros with real consequences
+3. **Check fit** — resume feedback against the actual rubric
+4. **Prove it** — ship one adoption artifact sample (PR or Loom). This is the real filter.
+
+## The mechanics are the teaching
+
+| Mechanic | What you do | What it teaches |
+|---|---|---|
+| **Tab-fire** | A dotted suggestion line tracks the best target; press Tab to accept and snap-fire | Accepting a good completion beats aiming manually |
+| **Trust meter** | Collisions and overclaiming (long miss streaks) drain Trust; conversions and phase clears restore it | Adoption work starts with not breaking the team |
+| **Convert blockers** | "low trust in AI" and "IDE skepticism" can't be shot dead — fly alongside them to pair and convert them into allies | Build *with* them, not in front of them |
+| **Agent deploys** | Cloud Agent pickups bank charges; press E to launch a drone at chore blockers while you handle the judgment-heavy ones | Agents take the toil, you take the thinking |
+| **Persistent Rules** | A Rules pickup permanently pre-weakens future spawns of a blocker type | Rules libraries outlive the session |
+| **Consequential retros** | Your intervention choice after each phase concretely modifies the next wave | Interventions have consequences, not just answers |
+
+Controls: Arrows/WASD to fly, Space to fire, **Tab** to accept the suggestion, **E** to deploy an agent, P to pause. Touch controls on mobile.
+
+## Share your run
+
+Every finished run produces a permalink (`/run/<code>`) with your **builder identity** — Trust Guardian, Workflow Diagnoser, Systems Operator, Enablement Operator, or Adoption Systems Builder — that unfurls as a rich Open Graph card in feeds. Run results are encoded entirely in the URL; nothing is stored.
 
 ## Run locally
 
@@ -22,73 +43,36 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
-## Scripts
+Resume fit check requires `OPENAI_API_KEY`.
 
-- `npm run dev` — local dev server
-- `npm run lint` — ESLint
-- `npm run build` — production build
+## Resume fit check
 
-## Play → Prove
+Upload PDF/TXT or paste text at `#resume-feedback`. Dimensions: technical architecture, systems thinking, build-with enablement, measurement, artifact craft, change practice. Advisory only; resumes are not stored.
 
-### Account desk + phase retros
+## Artifact challenge
 
-- **Account desk** (`#account-desk`): a short scripted ADM huddle that teaches intervention judgment before or beside the game.
-- **Phase retros**: after each cleared phase, candidates answer three role questions (struggling moment, intervention, leave-behind). Answers appear on the scorecard and in share text.
+Ship one adoption artifact sample. Start by reading the `.cursorrules` at the repo root — it's written as a model of the leave-behind artifacts this role ships. The rubric and PR template ask for artifact type, target stack, ownership path, and measurability.
 
-### Loop A: Play (job preview)
+Apply: [AI Adoption Engineer](https://cursor.com/careers/ai-adoption-engineer)
 
-- Four campaign phases; clear Phase 4 to complete the mission
-- Distinctive blockers in [`src/game/blockers.ts`](src/game/blockers.ts):
-  - `low trust in AI` — armored (two hits)
-  - `no evals` — regenerates if you do not finish the eval window
-  - `unclear ROI` — drains Impact while it lives
-- Powerups in [`src/game/powerups.ts`](src/game/powerups.ts):
-  - **Rules** — temporary shield
-  - **Tab** — faster fire
-  - **Agent Mode** — steers assist toward the nearest hard blocker
-- Scorecard in [`src/game/scorecard.ts`](src/game/scorecard.ts) scores diagnosis, trust, systems, and tool use. Arcade skill is not the filter.
-
-### Resume fit check
-
-Candidates can upload a PDF/TXT resume (or paste text) at `#resume-feedback`. The API scores against the AI Adoption Engineer rubric in [`src/game/roles/ai-adoption-engineer.ts`](src/game/roles/ai-adoption-engineer.ts) and returns dimension scores, gaps, and next steps.
-
-- Endpoint: `POST /api/resume-feedback`
-- Requires `OPENAI_API_KEY` in the environment
-- Resumes are processed in memory and not stored
-- Feedback is advisory only — not an official hiring decision
-
-### Loop B: Builder challenge (the filter)
-
-Fork Cursteroids and make **one** adoption blocker more interesting — as a mechanic or a teaching moment. Open a PR, or record a short Loom plus a written note on why this helps a team adopt Cursor.
-
-Then apply at [AI Adoption Engineer](https://cursor.com/careers/ai-adoption-engineer) and include your PR or Loom link.
-
-### Rubric
-
-| Criterion | What strong looks like |
-|---|---|
-| Struggling moment | Names a real adoption friction, not a vague AI buzzword |
-| Mechanic quality | The blocker behaves differently in play, or teaches a clear Cursor workflow |
-| Teaching value | A teammate could explain the lesson after one run |
-| Taste and restraint | Small, shippable change. No feature pile-on |
-| Shippability | PR is focused, typed, and runnable with `npm run dev` |
-
-Use the PR template in [`.github/pull_request_template.md`](.github/pull_request_template.md).
-
-### Where to change code
+## Where to change code
 
 | Goal | Start here |
 |---|---|
-| New or deeper blocker mechanic | [`src/game/blockers.ts`](src/game/blockers.ts) + collision logic in [`src/game/engine.ts`](src/game/engine.ts) |
-| New powerup | [`src/game/powerups.ts`](src/game/powerups.ts) |
-| Scorecard copy / dimensions | [`src/game/scorecard.ts`](src/game/scorecard.ts) |
-| Challenge brief on the page | [`src/game/challenge.ts`](src/game/challenge.ts) + [`src/app/page.tsx`](src/app/page.tsx) |
+| Role copy / resume rubric | [`src/game/roles/ai-adoption-engineer.ts`](src/game/roles/ai-adoption-engineer.ts) |
+| Game mechanics | [`src/game/engine.ts`](src/game/engine.ts), [`src/game/blockers.ts`](src/game/blockers.ts) |
+| Powerups | [`src/game/powerups.ts`](src/game/powerups.ts) |
+| Retro → wave modifiers | [`src/game/modifiers.ts`](src/game/modifiers.ts) |
+| Account desk / retros | [`src/game/dialogue.ts`](src/game/dialogue.ts) |
+| Builder identities / share | [`src/game/profiles.ts`](src/game/profiles.ts), [`src/game/share.ts`](src/game/share.ts), [`src/game/encode.ts`](src/game/encode.ts) |
+| Result permalink page / OG card | [`src/app/run/[code]/`](src/app/run) |
+| Challenge brief | [`src/game/challenge.ts`](src/game/challenge.ts) |
+
+There are a few things in here for the curious. Poking around is encouraged — it's the job.
 
 ## For recruiters
 
-Arcade score is not the hiring signal. Read the PR or Loom against the rubric. Strong submissions make one blocker concrete and show how the candidate thinks about enablement.
-
-See [`EVAL.md`](EVAL.md).
+See [`EVAL.md`](EVAL.md). Arcade score is not the filter. Artifact PRs are.
 
 ## Stack
 
@@ -96,3 +80,4 @@ See [`EVAL.md`](EVAL.md).
 - TypeScript
 - Material UI
 - Canvas game loop
+- Vercel AI SDK (resume feedback)

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import ConsoleGreeting from "@/components/ConsoleGreeting";
 import { Providers } from "./providers";
 
 const geistSans = Geist({
@@ -14,9 +15,24 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Cursteroids | AI Adoption Engineer Simulator",
+  // Includes the multi-zone base path: file-convention OG image URLs compose
+  // from metadataBase without the basePath prefix, so it must live here.
+  metadataBase: new URL("https://mlynn.org/cursteroids"),
+  title: "Cursteroids — the job description you can play",
   description:
-    "Play a four-phase AI adoption mission, then prove your fit: fork Cursteroids and improve one blocker.",
+    "Cursor is hiring an AI Adoption Engineer. Play the job: clear adoption blockers, accept Tab suggestions, deploy agents on the toil, keep Trust alive. Then prove it with a real artifact.",
+  openGraph: {
+    title: "Cursteroids — the job description you can play",
+    description:
+      "Cursor is hiring an AI Adoption Engineer. Ninety seconds of play, one real artifact. Which builder are you?",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Cursteroids — the job description you can play",
+    description:
+      "Cursor is hiring an AI Adoption Engineer. Ninety seconds of play, one real artifact. Which builder are you?",
+  },
 };
 
 export default function RootLayout({
@@ -27,6 +43,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
       <body>
+        <ConsoleGreeting />
         <Providers>{children}</Providers>
       </body>
     </html>

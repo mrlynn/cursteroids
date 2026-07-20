@@ -1,34 +1,37 @@
 import { CAREERS_URL, REPO_URL } from "@/game/constants";
 
-export const CHALLENGE_TITLE = "Builder challenge";
+export const CHALLENGE_TITLE = "Artifact challenge";
 
 export const CHALLENGE_BRIEF =
-  "Fork Cursteroids and make one adoption blocker more interesting — as a mechanic or a teaching moment. Open a PR, or record a short Loom plus a written note on why this helps a team adopt Cursor.";
+  "Fork Cursteroids and ship one adoption artifact sample — a Rules snippet, prompt architecture, MCP sketch, workflow guide, dashboard brief, Cloud Agent workflow, or enablement guide — that would help a real team make Cursor stick. Open a PR, or record a short Loom plus a written note on why the team would own it after you leave.";
 
 export const CHALLENGE_RUBRIC = [
   {
     label: "Struggling moment",
-    detail: "Names a real adoption friction, not a vague AI buzzword.",
+    detail: "Names a real org/workflow gap, not a vague AI buzzword.",
   },
   {
-    label: "Mechanic quality",
-    detail: "The blocker behaves differently in play, or teaches a clear Cursor workflow.",
+    label: "Artifact specificity",
+    detail: "Grounded in a codebase, stack, or team convention — not a generic tip sheet.",
   },
   {
-    label: "Teaching value",
-    detail: "A teammate could explain the lesson after one run.",
+    label: "Build-with ownership",
+    detail: "Clear how the team would own and extend the artifact after you leave.",
   },
   {
-    label: "Taste and restraint",
-    detail: "Small, shippable change. No feature pile-on.",
+    label: "Measurability",
+    detail: "Hints at what would change (habits, cycle time, usage depth) if it worked.",
   },
   {
     label: "Shippability",
-    detail: "PR is focused, typed, and runnable with npm run dev.",
+    detail: "Focused, typed, runnable with npm run dev — or a crisp Loom + written brief.",
   },
 ] as const;
 
+export const CHALLENGE_SHARE_SEED =
+  "I shipped a sample adoption artifact in Cursteroids for the AI Adoption Engineer role.";
+
 export const RECRUITER_EVAL_NOTE =
-  "Arcade score is not the hiring signal. Read the PR or Loom against the rubric above. Strong submissions make one blocker concrete and show how the candidate thinks about enablement.";
+  "Arcade score is not the hiring signal. Read the PR or Loom against the artifact rubric. Strong submissions look like Rules, prompts, MCP, dashboards, or workflow systems a real eng team could own — not event agendas or game reskins.";
 
 export { CAREERS_URL, REPO_URL };

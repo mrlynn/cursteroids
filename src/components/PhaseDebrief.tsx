@@ -7,6 +7,7 @@ import Typography from "@mui/material/Typography";
 import { useMemo, useState } from "react";
 import { debriefQuestionsForPhase, type PhaseDebrief } from "@/game/dialogue";
 import { WAVE_BRIEFS } from "@/game/campaign";
+import { modifierForIntervention, modifierPreviewText } from "@/game/modifiers";
 
 type PhaseDebriefProps = {
   phase: number;
@@ -47,8 +48,8 @@ export function PhaseDebriefPanel({ phase, onComplete }: PhaseDebriefProps) {
           Think like an AI Adoption Engineer
         </Typography>
         <Typography color="text.secondary" variant="body2">
-          Events are a mechanism. Behavior change is the goal. Pick the calls you would make in
-          the room, then continue the mission.
+          Credibility comes from what you ship alongside the team. Pick the artifact and habit
+          change you would leave behind, then continue the mission.
         </Typography>
       </Stack>
 
@@ -78,6 +79,11 @@ export function PhaseDebriefPanel({ phase, onComplete }: PhaseDebriefProps) {
               );
             })}
           </Stack>
+          {question.id === "intervention" && answers.intervention ? (
+            <Typography variant="caption" color="text.secondary" sx={{ fontStyle: "italic" }}>
+              {modifierPreviewText(modifierForIntervention(answers.intervention))}
+            </Typography>
+          ) : null}
         </Stack>
       ))}
 

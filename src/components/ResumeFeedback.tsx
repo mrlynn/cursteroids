@@ -10,8 +10,11 @@ import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import { useState, type ChangeEvent, type FormEvent } from "react";
-import { CAREERS_URL } from "@/game/constants";
+import { FitShareCard } from "@/components/FitShareCard";
+import { BASE_PATH, CAREERS_URL } from "@/game/constants";
+import { AI_ADOPTION_ENGINEER_ROLE } from "@/game/roles/ai-adoption-engineer";
 import type { ResumeFeedbackResult } from "@/game/roles/resume-feedback-schema";
+import { buildFitShareCard } from "@/game/share";
 
 type ApiSuccess = {
   role: { id: string; title: string; careersUrl: string };
@@ -60,7 +63,9 @@ export function ResumeFeedback() {
     }
 
     try {
-      const response = await fetch("/api/resume-feedback", {
+      // fetch() does not get the Next.js basePath prefix automatically —
+      // without it this would hit the host zone's /api on mlynn.org.
+      const response = await fetch(`${BASE_PATH}/api/resume-feedback`, {
         method: "POST",
         body,
       });
@@ -92,9 +97,9 @@ export function ResumeFeedback() {
           Upload your resume for AI Adoption Engineer feedback
         </Typography>
         <Typography color="text.secondary" sx={{ maxWidth: 860 }}>
-          Get a private, advisory read against the real role rubric: facilitation, technical
-          credibility, behavior change, systems, customer context, and communication range. Your
-          file is analyzed in memory and not stored.
+          Get a private, advisory read against the real role rubric: technical architecture,
+          systems thinking, build-with enablement, measurement, artifact craft, and change
+          practice. Your file is analyzed in memory and not stored.
         </Typography>
       </Stack>
 
@@ -237,9 +242,19 @@ export function ResumeFeedback() {
             ))}
           </Stack>
 
+          <FitShareCard
+            card={buildFitShareCard({
+              profileHeadline: result.feedback.headline,
+              artifact:
+                result.feedback.strengths[0] ??
+                AI_ADOPTION_ENGINEER_ROLE.artifacts[0].label,
+            })}
+            applyHref={result.role.careersUrl || CAREERS_URL}
+          />
+
           <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
-            <Button variant="contained" href="#builder-challenge">
-              Try the builder challenge
+            <Button variant="contained" href="#artifact-challenge">
+              Try the artifact challenge
             </Button>
             <Button
               variant="outlined"
