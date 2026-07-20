@@ -1,4 +1,12 @@
 import { CAMPAIGN_PHASES } from "@/game/constants";
+import { formatDebriefsForShare } from "@/game/dialogue";
+import { profileForDimensions, type BuilderProfile } from "@/game/profiles";
+import {
+  buildRunCodeFromSnapshot,
+  buildRunShareText,
+  buildRunUrl,
+  fitShareFromGameSnapshot,
+} from "@/game/share";
 import type { GameSnapshot } from "@/game/types";
 
 export type ScoreDimension = {
@@ -14,6 +22,14 @@ export type RecruitingScorecard = {
   dimensions: ScoreDimension[];
   shareText: string;
   completedMission: boolean;
+  debriefs: GameSnapshot["debriefs"];
+  fitCard: ReturnType<typeof fitShareFromGameSnapshot>;
+  /** Builder identity for this run (drives the /run permalink + OG card). */
+  profile: BuilderProfile;
+  /** Shareable permalink to this run's result page. */
+  runUrl: string;
+  /** Short, feed-friendly share blurb (identity + tagline + link). */
+  runShareText: string;
 };
 
 function clampScore(value: number) {
@@ -32,25 +48,30 @@ function diagnosisScore(snapshot: GameSnapshot) {
 }
 
 function trustScore(snapshot: GameSnapshot) {
-  const lifePoints = snapshot.lives * 28;
+  const trustPoints = snapshot.trust * 0.7;
   const nearMissPoints = Math.min(36, snapshot.nearMisses * 6);
-  const accuracyPoints = snapshot.accuracy * 0.28;
+  const accuracyPoints = snapshot.accuracy * 0.2;
+  const tabPoints = Math.min(12, snapshot.tabAccepts * 1.5);
   const deathPenalty = snapshot.status === "gameOver" ? 18 : 0;
-  return clampScore(lifePoints + nearMissPoints + accuracyPoints - deathPenalty);
+  return clampScore(trustPoints + nearMissPoints + accuracyPoints + tabPoints - deathPenalty);
 }
 
 function systemsScore(snapshot: GameSnapshot) {
   const phasePoints = Math.min(CAMPAIGN_PHASES, snapshot.level) * 18;
   const completeBonus = snapshot.status === "missionComplete" ? 28 : 0;
   const progressBonus = snapshot.level > 1 ? 10 : 0;
-  return clampScore(phasePoints + completeBonus + progressBonus);
+  const debriefBonus = Math.min(24, snapshot.debriefs.length * 6);
+  return clampScore(phasePoints + completeBonus + progressBonus + debriefBonus);
 }
 
 function toolsScore(snapshot: GameSnapshot) {
-  const collected = snapshot.powerupsCollected * 18;
-  const usedWell = snapshot.powerupsUsedWell * 16;
-  const activeBonus = snapshot.activePowerup ? 8 : 0;
-  return clampScore(collected + usedWell + activeBonus);
+  const collected = snapshot.powerupsCollected * 10;
+  const usedWell = snapshot.powerupsUsedWell * 12;
+  const agentPoints = snapshot.agentDeploys * 14;
+  const conversionPoints = snapshot.conversions * 16;
+  const rulesCoveragePoints = snapshot.rulesCoverageCount * 10;
+  const activeBonus = snapshot.activePowerup ? 6 : 0;
+  return clampScore(collected + usedWell + agentPoints + conversionPoints + rulesCoveragePoints + activeBonus);
 }
 
 function dimensionBlurb(id: ScoreDimension["id"], score: number): string {
@@ -65,10 +86,10 @@ function dimensionBlurb(id: ScoreDimension["id"], score: number): string {
       return "Next run: prioritize low trust, no evals, and unclear ROI.";
     case "trust":
       if (score >= 70) {
-        return "You protected Trust under pressure. That is the job.";
+        return "You protected the Trust meter under pressure and let Tab-fire do the precise work.";
       }
       if (score >= 40) {
-        return "Some Trust held. Enablement fails when demos burn credibility.";
+        return "Some Trust held. Enablement fails when demos burn credibility — and overclaiming burns Trust too.";
       }
       return "Trust collapsed early. Adoption work starts with not breaking the team.";
     case "systems":
@@ -81,12 +102,12 @@ function dimensionBlurb(id: ScoreDimension["id"], score: number): string {
       return "Finish the four-phase mission to show you can run the loop end to end.";
     case "tools":
       if (score >= 70) {
-        return "You used Cursor-shaped powerups when the moment called for them.";
+        return "You shipped Rules coverage, deployed the Cloud Agent on chores, and converted skeptics instead of just clearing them.";
       }
       if (score >= 40) {
-        return "Some tool use showed up. Timing matters as much as picking them up.";
+        return "Some artifact powerups showed up. Deploying the Agent and pairing with convert-type blockers count more than just picking up drops.";
       }
-      return "Grab Rules, Tab, or Agent Mode drops and spend them on hard waves.";
+      return "Pick up Rules, MCP, Cloud Agent, or Dashboard drops — then deploy the Agent (E) and pair with skeptics instead of shooting through them.";
     default: {
       const _exhaustive: never = id;
       return _exhaustive;
@@ -137,12 +158,27 @@ export function buildScorecard(snapshot: GameSnapshot, origin = ""): RecruitingS
   const headline = headlineFor(dimensions, completedMission);
   const summary = summaryFor(dimensions, completedMission);
   const dimLine = dimensions.map((d) => `${d.label} ${d.score}`).join(" · ");
+  const debriefLines = formatDebriefsForShare(snapshot.debriefs);
+
+  const profile = profileForDimensions(
+    dimensions.map((d) => ({ id: d.id, score: d.score })),
+    completedMission,
+  );
+  const runCode = buildRunCodeFromSnapshot(snapshot, profile.id, {
+    diagnosis: dimensions[0].score,
+    trust: dimensions[1].score,
+    systems: dimensions[2].score,
+    tools: dimensions[3].score,
+  });
+  const runUrl = buildRunUrl(runCode, origin);
+  const runShareText = buildRunShareText(profile.name, runUrl);
+
+  const fitCard = fitShareFromGameSnapshot(snapshot, headline, origin, runUrl);
   const shareText = [
-    `Cursteroids — AI Adoption Engineer simulator`,
-    `${headline}`,
-    `Impact ${snapshot.score} · Phase ${Math.min(snapshot.level, CAMPAIGN_PHASES)}/${CAMPAIGN_PHASES} · ${dimLine}`,
-    `Builder challenge: fork and improve one blocker.`,
-    origin || (typeof window !== "undefined" ? window.location.href : ""),
+    runShareText,
+    "",
+    `Impact ${Math.round(snapshot.score)} · Phase ${Math.min(snapshot.level, CAMPAIGN_PHASES)}/${CAMPAIGN_PHASES} · ${dimLine}`,
+    debriefLines ? `Retros:\n${debriefLines}` : "",
   ]
     .filter(Boolean)
     .join("\n");
@@ -153,5 +189,10 @@ export function buildScorecard(snapshot: GameSnapshot, origin = ""): RecruitingS
     dimensions,
     shareText,
     completedMission,
+    debriefs: snapshot.debriefs,
+    fitCard,
+    profile,
+    runUrl,
+    runShareText,
   };
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import HelpOutlineRoundedIcon from "@mui/icons-material/HelpOutlineRounded";
 import PauseRoundedIcon from "@mui/icons-material/PauseRounded";
 import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
 import RestartAltRoundedIcon from "@mui/icons-material/RestartAltRounded";
@@ -13,25 +14,35 @@ import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import { useTheme } from "@mui/material/styles";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { FitShareCard } from "@/components/FitShareCard";
+import { HowToPlayDialog, markOnboarded, useOnboarded } from "@/components/HowToPlay";
+import { PhaseDebriefPanel } from "@/components/PhaseDebrief";
+import { TouchControls, useCoarsePointer } from "@/components/TouchControls";
 import { phaseLabel } from "@/game/campaign";
 import { CHALLENGE_BRIEF, REPO_URL } from "@/game/challenge";
 import {
+  AGENT_MAX_CHARGES,
   APPLY_WITH_CHALLENGE_HINT,
   CAREERS_URL,
   CAMPAIGN_PHASES,
-  INITIAL_LIVES,
+  TRUST_START,
 } from "@/game/constants";
+import type { PhaseDebrief } from "@/game/dialogue";
 import {
+  completeDebrief,
   createInitialGame,
   drawGame,
   getPalette,
   getSnapshot,
   setPalette,
   startMission,
+  timeScaleFor,
   updateParticles,
   updatePlaying,
   wrapPosition,
 } from "@/game/engine";
+import { createSequenceDetector, KONAMI_SEQUENCE } from "@/game/easter-eggs";
+import { InputController } from "@/game/input";
 import { POWERUP_KINDS } from "@/game/powerups";
 import { buildScorecard } from "@/game/scorecard";
 import type { GameSnapshot } from "@/game/types";
@@ -41,29 +52,47 @@ function emptySnapshot(): GameSnapshot {
     status: "ready",
     score: 0,
     highScore: 0,
-    lives: INITIAL_LIVES,
+    trust: TRUST_START,
     level: 1,
     asteroids: 0,
     accuracy: 100,
     nearMisses: 0,
+    tabAccepts: 0,
+    conversions: 0,
+    agentDeploys: 0,
+    agentCharges: 0,
+    rulesCoverageCount: 0,
     blockersCleared: {},
     powerupsCollected: 0,
     powerupsUsedWell: 0,
     activePowerup: null,
     toast: null,
+    debriefs: [],
+    debriefPhase: 0,
+    waveModifierLabel: null,
   };
 }
 
 export function CursteroidsGame() {
   const theme = useTheme();
+  const isCoarsePointer = useCoarsePointer();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const animationRef = useRef<number | null>(null);
   const lastFrameRef = useRef<number | null>(null);
   const nowRef = useRef(0);
   const gameRef = useRef(createInitialGame());
+  // A stable InputController instance. Plain state (not a ref) so it can be
+  // read during render — e.g. passed straight to <TouchControls> — without
+  // tripping the "don't read ref.current during render" rule; the object
+  // identity never changes because the setter is never called again.
+  const [input] = useState(() => new InputController());
   const [snapshot, setSnapshot] = useState<GameSnapshot>(emptySnapshot);
   const [shareStatus, setShareStatus] = useState<"idle" | "copied">("idle");
+  const onboarded = useOnboarded();
+  const [manualHelpOpen, setManualHelpOpen] = useState(false);
+  // Auto-open on first visit (until dismissed once), or when reopened via the button.
+  const helpOpen = manualHelpOpen || !onboarded;
 
   const syncSnapshot = useCallback(() => {
     setSnapshot(getSnapshot(gameRef.current, nowRef.current));
@@ -84,9 +113,37 @@ export function CursteroidsGame() {
     syncSnapshot();
   }, [syncSnapshot]);
 
+  const onDebriefComplete = useCallback(
+    (debrief: PhaseDebrief) => {
+      completeDebrief(gameRef.current, debrief, performance.now() / 1000);
+      syncSnapshot();
+    },
+    [syncSnapshot],
+  );
+
+  const openHelp = useCallback(() => {
+    const game = gameRef.current;
+    if (game.status === "playing") {
+      game.status = "paused";
+      syncSnapshot();
+    }
+    setManualHelpOpen(true);
+  }, [syncSnapshot]);
+
+  const closeHelp = useCallback(() => {
+    setManualHelpOpen(false);
+    markOnboarded();
+  }, []);
+
+  const startFromHelp = useCallback(() => {
+    closeHelp();
+    startGame();
+  }, [closeHelp, startGame]);
+
   const scorecard = buildScorecard(snapshot);
   const showScorecard =
     snapshot.status === "gameOver" || snapshot.status === "missionComplete";
+  const showDebrief = snapshot.status === "debriefing";
 
   const copyShareText = useCallback(async () => {
     await navigator.clipboard.writeText(scorecard.shareText);
@@ -105,7 +162,8 @@ export function CursteroidsGame() {
     const resize = () => {
       const rect = stage.getBoundingClientRect();
       const width = Math.max(320, Math.floor(rect.width));
-      const height = Math.max(420, Math.min(680, Math.floor(width * 0.62)));
+      const aspect = width < 500 ? 0.9 : 0.62;
+      const height = Math.max(420, Math.min(680, Math.floor(width * aspect)));
       const density = window.devicePixelRatio || 1;
 
       canvas.width = Math.floor(width * density);
@@ -132,28 +190,49 @@ export function CursteroidsGame() {
   }, []);
 
   useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (["ArrowLeft", "ArrowRight", "ArrowUp", "Space"].includes(event.code)) {
-        event.preventDefault();
-      }
+    const controller = input;
+    const konami = createSequenceDetector(KONAMI_SEQUENCE, () => {
+      const game = gameRef.current;
+      game.effects.agentCharges = AGENT_MAX_CHARGES;
+      game.toast = "Founding-engineer mode: agents fully staffed. Ship it.";
+      game.toastUntil = nowRef.current + 3.2;
+      syncSnapshot();
+    });
 
+    const onKeyDown = (event: KeyboardEvent) => {
+      konami(event.code);
       const game = gameRef.current;
 
-      if (event.code === "KeyP") {
-        togglePause();
+      // While the how-to-play dialog is up, leave every key to the dialog
+      // (Enter would otherwise start a mission behind it).
+      if (helpOpen) {
         return;
       }
 
-      if (event.code === "Enter" && game.status !== "playing") {
+      if (game.status === "debriefing") {
+        // Stop the page from scrolling under the form, but leave Tab alone
+        // so it still navigates focus between the debrief's buttons.
+        if (["ArrowLeft", "ArrowRight", "ArrowUp", "Space"].includes(event.code)) {
+          event.preventDefault();
+        }
+        return;
+      }
+
+      if (
+        event.code === "Enter" &&
+        game.status !== "playing" &&
+        game.status !== "paused"
+      ) {
+        event.preventDefault();
         startGame();
         return;
       }
 
-      game.keys.add(event.code);
+      controller.handleKeyDown(event);
     };
 
     const onKeyUp = (event: KeyboardEvent) => {
-      gameRef.current.keys.delete(event.code);
+      controller.handleKeyUp(event);
     };
 
     window.addEventListener("keydown", onKeyDown);
@@ -162,8 +241,9 @@ export function CursteroidsGame() {
     return () => {
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
+      controller.reset();
     };
-  }, [startGame, togglePause]);
+  }, [helpOpen, input, startGame, syncSnapshot]);
 
   useEffect(() => {
     const tick = (timestamp: number) => {
@@ -171,22 +251,30 @@ export function CursteroidsGame() {
       const context = canvas?.getContext("2d");
       const game = gameRef.current;
       const lastFrame = lastFrameRef.current ?? timestamp;
-      const delta = Math.min((timestamp - lastFrame) / 1000, 0.034);
+      const rawDelta = Math.min((timestamp - lastFrame) / 1000, 0.034);
       const now = timestamp / 1000;
       lastFrameRef.current = timestamp;
       nowRef.current = now;
 
-      if (game.status === "playing") {
-        updatePlaying(game, delta, now);
+      const intent = input.poll();
+
+      if (intent.pause) {
+        togglePause();
       }
 
-      updateParticles(game, delta);
+      if (game.status === "playing") {
+        const delta = rawDelta * timeScaleFor(game, now);
+        updatePlaying(game, delta, now, intent);
+        updateParticles(game, delta);
+      } else {
+        updateParticles(game, rawDelta);
+      }
 
       if (context) {
         drawGame(context, game, now);
       }
 
-      game.snapshotTimer += delta;
+      game.snapshotTimer += rawDelta;
       if (game.snapshotTimer > 0.14) {
         game.snapshotTimer = 0;
         syncSnapshot();
@@ -202,7 +290,7 @@ export function CursteroidsGame() {
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [syncSnapshot]);
+  }, [input, syncSnapshot, togglePause]);
 
   useEffect(() => {
     setPalette(theme.palette.mode === "dark" ? "dark" : "light");
@@ -214,12 +302,14 @@ export function CursteroidsGame() {
 
   return (
     <Card
+      id="game"
       component="section"
       sx={{
         p: { xs: 1, md: 1.25 },
         borderRadius: 2,
         overflow: "hidden",
         background: "background.paper",
+        scrollMarginTop: 24,
       }}
     >
       <Stack spacing={2}>
@@ -235,10 +325,23 @@ export function CursteroidsGame() {
               label={phaseLabel(Math.min(snapshot.level, CAMPAIGN_PHASES))}
               variant="outlined"
             />
-            <Chip label={`Trust ${snapshot.lives}`} variant="outlined" />
+            <Chip
+              label={`Trust ${snapshot.trust}/100`}
+              color={snapshot.trust <= 30 ? "error" : "default"}
+              variant="outlined"
+            />
             <Chip label={`${snapshot.accuracy}% accuracy`} variant="outlined" />
+            {snapshot.agentCharges > 0 ? (
+              <Chip label={`Agent x${snapshot.agentCharges} (E)`} variant="outlined" />
+            ) : null}
+            {snapshot.conversions > 0 ? (
+              <Chip label={`Converted ${snapshot.conversions}`} variant="outlined" />
+            ) : null}
             {snapshot.activePowerup ? (
               <Chip label={snapshot.activePowerup} color="secondary" variant="outlined" />
+            ) : null}
+            {snapshot.waveModifierLabel ? (
+              <Chip label={snapshot.waveModifierLabel} color="info" variant="outlined" />
             ) : null}
           </Stack>
 
@@ -259,6 +362,14 @@ export function CursteroidsGame() {
               startIcon={isPlaying ? <PauseRoundedIcon /> : <PlayArrowRoundedIcon />}
             >
               {isPlaying ? "Pause" : "Resume"}
+            </Button>
+            <Button
+              variant="outlined"
+              onClick={openHelp}
+              startIcon={<HelpOutlineRoundedIcon />}
+              aria-label="How to play"
+            >
+              How to play
             </Button>
           </Stack>
         </Stack>
@@ -285,7 +396,28 @@ export function CursteroidsGame() {
               outline: "none",
             }}
           />
+
+          <TouchControls
+            input={input}
+            agentCharges={snapshot.agentCharges}
+            status={snapshot.status}
+            onStart={startGame}
+          />
         </Box>
+
+        <HowToPlayDialog
+          open={helpOpen}
+          onClose={closeHelp}
+          onStart={startFromHelp}
+          isCoarsePointer={isCoarsePointer}
+        />
+
+        {showDebrief ? (
+          <PhaseDebriefPanel
+            phase={snapshot.debriefPhase || snapshot.level}
+            onComplete={onDebriefComplete}
+          />
+        ) : null}
 
         {showScorecard ? (
           <Card
@@ -349,6 +481,23 @@ export function CursteroidsGame() {
                 ))}
               </Stack>
 
+              {scorecard.debriefs.length > 0 ? (
+                <Stack spacing={1}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+                    Your phase retros
+                  </Typography>
+                  {scorecard.debriefs.map((debrief) => (
+                    <Typography key={debrief.phase} variant="body2" color="text.secondary">
+                      Phase {debrief.phase} · {debrief.intervention}. Leave behind:{" "}
+                      {debrief.leaveBehind}
+                      {debrief.note ? ` (${debrief.note})` : ""}
+                    </Typography>
+                  ))}
+                </Stack>
+              ) : null}
+
+              <FitShareCard card={scorecard.fitCard} applyHref={CAREERS_URL} />
+
               <Divider />
               <Typography color="text.secondary" variant="body2">
                 {CHALLENGE_BRIEF}
@@ -366,11 +515,7 @@ export function CursteroidsGame() {
                 >
                   Fork the challenge
                 </Button>
-                <Button
-                  size="small"
-                  variant="text"
-                  href="#builder-challenge"
-                >
+                <Button size="small" variant="text" href="#artifact-challenge">
                   Read the brief
                 </Button>
               </Stack>
@@ -379,8 +524,9 @@ export function CursteroidsGame() {
         ) : null}
 
         <Typography color="text.secondary" variant="body2">
-          Fly with Arrow keys or WASD. Fire with Space. Pause with P. Pick up{" "}
-          {POWERUP_KINDS.join(", ")} drops to use real Cursor-shaped tools.
+          {isCoarsePointer
+            ? `Drag the left side of the stage to fly — sideways to turn, up to thrust. TAB snap-fires the suggested target (the dotted line), FIRE shoots, and E deploys a banked Cloud Agent charge. Pick up artifact powerups: ${POWERUP_KINDS.join(", ")}.`
+            : `Fly with Arrow keys or WASD. Fire with Space. Press Tab to snap-fire at the suggested target (the dotted line). Press E to deploy a banked Cloud Agent charge at chore blockers. Fly alongside a "won't break" blocker to pair with and convert it. Pause with P. Pick up artifact powerups: ${POWERUP_KINDS.join(", ")}.`}
         </Typography>
       </Stack>
     </Card>

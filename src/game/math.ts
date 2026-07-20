@@ -36,3 +36,12 @@ export function normalize(vector: Vector): Vector {
   const length = Math.hypot(vector.x, vector.y) || 1;
   return { x: vector.x / length, y: vector.y / length };
 }
+
+export function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
+}
+
+/** Signed angle difference (b - a) normalized to the range [-PI, PI]. */
+export function angleDiff(a: number, b: number) {
+  return Math.atan2(Math.sin(b - a), Math.cos(b - a));
+}

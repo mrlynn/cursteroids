@@ -7,36 +7,38 @@ This note is for recruiters and hiring managers reviewing AI Adoption Engineer c
 | Loop | Purpose | Signal strength |
 |---|---|---|
 | Play (arcade mission) | Job preview and self-selection | Weak as a hiring filter |
-| Prove (PR or Loom) | How the candidate makes adoption concrete | Primary signal |
+| Shared run cards (`/run/<code>` builder identities) | Distribution and top-of-funnel | Zero — purely social |
+| Account desk + phase retros | Judgment about artifacts and habit change | Medium coaching signal |
+| Prove (artifact PR or Loom) | How the candidate ships adoption systems | Primary signal |
 
-Do **not** rank candidates by Impact score, accuracy, or archetype headline from the in-game scorecard. Those dimensions exist to teach the role metaphor and invite the challenge.
+Do **not** rank candidates by Impact score or powerup count. Evaluate whether they think like a builder who ships Rules, prompts, MCP, dashboards, Cloud Agents, and workflow guides alongside eng teams.
 
 ## How to review a submission (under 5 minutes)
 
 1. Open the PR (or Loom + written note).
-2. Read the struggling moment. Is it a real team friction or buzzword theater?
-3. Play or watch the change. Does one blocker behave differently or teach a Cursor workflow?
-4. Score against the rubric in the README / site:
+2. Identify the artifact type and struggling moment.
+3. Ask: would a real team own this after the candidate leaves?
+4. Score against the artifact rubric:
 
 | Criterion | Pass bar |
 |---|---|
-| Struggling moment | Specific, believable adoption friction |
-| Mechanic quality | Clear difference in play or teaching |
-| Teaching value | Someone else could retell the lesson |
-| Taste and restraint | Focused change; not a kitchen-sink rewrite |
-| Shippability | Runs locally; PR template filled in |
+| Struggling moment | Specific org/workflow gap |
+| Artifact specificity | Grounded in a stack or convention |
+| Build-with ownership | Team can extend it without the candidate |
+| Measurability | Hint of habit or delivery change |
+| Shippability | Focused PR or crisp Loom + brief |
 
-5. Strong pass → advance. Borderline → use as interview prompt ("walk me through why you chose this blocker"). Weak → decline or soft pass depending on rest of packet.
-
-## Apply path
-
-Candidates should apply via [AI Adoption Engineer](https://cursor.com/careers/ai-adoption-engineer) and include their Cursteroids PR or Loom link in the application.
-
-Role URL is centralized as `CAREERS_URL` in [`src/game/constants.ts`](src/game/constants.ts).
+5. Strong pass → advance. Borderline → interview prompt: "Walk me through how you'd ship this with a skeptical platform team." Weak → decline or soft pass depending on the rest of the packet.
 
 ## Red flags
 
-- High score brag with no PR or Loom
-- Reskin-only changes (new labels, no mechanic or teaching)
+- High score brag with no artifact
+- Event agendas or training decks as the only deliverable
+- Generic tips with no codebase/org specificity
 - Giant unrelated refactors
-- Copy that overclaims Cursor features the change does not demonstrate
+
+## Apply path
+
+Candidates apply via [AI Adoption Engineer](https://cursor.com/careers/ai-adoption-engineer) and include their Cursteroids PR or Loom link.
+
+Role URL is `CAREERS_URL` in [`src/game/constants.ts`](src/game/constants.ts).

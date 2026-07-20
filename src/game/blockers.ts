@@ -8,8 +8,8 @@ export const ADOPTION_BLOCKERS: AdoptionBlocker[] = [
   {
     label: "low trust in AI",
     fragments: ["bad prompts", "no review loop"],
-    mechanic: "armored",
-    hint: "Takes two hits. Trust is rebuilt in layers, not one demo.",
+    mechanic: "convert",
+    hint: "Won't break — pair with it. Fly alongside it to bring it around.",
   },
   {
     label: "legacy SDLC",
@@ -74,8 +74,8 @@ export const ADOPTION_BLOCKERS: AdoptionBlocker[] = [
   {
     label: "IDE skepticism",
     fragments: ["old habits", "fear of change"],
-    mechanic: "none",
-    hint: "Old habits outlast a single workshop.",
+    mechanic: "convert",
+    hint: "Won't break — pair with it. Fly alongside it to bring it around.",
   },
 ];
 
@@ -94,6 +94,10 @@ export function hitPointsForMechanic(mechanic: BlockerMechanic): number {
     case "regen":
     case "drain":
     case "none":
+      return 1;
+    case "convert":
+      // Never depleted by damage — bullets knock it back instead. The value
+      // only matters for display parity with other blockers.
       return 1;
     default: {
       const _exhaustive: never = mechanic;

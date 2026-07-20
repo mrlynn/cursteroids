@@ -1,20 +1,24 @@
-## Builder challenge submission
+## Artifact challenge submission
 
-### Blocker you improved
+### Artifact type
 
-<!-- e.g. low trust in AI, no evals, unclear ROI, or a new label -->
+<!-- Rules library · Prompt architecture · Workflow guide · Adoption dashboard · MCP config · Cloud Agent workflow · Enablement guide -->
+
+### Target stack / team context
+
+<!-- e.g. fintech monorepo, Python ML platform, legacy Java service -->
 
 ### Struggling moment
 
-<!-- What real adoption friction are you modeling? Be specific. -->
+<!-- What real org/workflow gap are you closing? Be specific. -->
 
-### What you changed
+### What you shipped
 
-<!-- Mechanic, teaching moment, or both. Link files if helpful. -->
+<!-- Link files or paste the sample. -->
 
-### Why this helps a team adopt Cursor
+### Why the team would own this after you leave
 
-<!-- 3–6 sentences. What would an eng manager or IC do differently after this? -->
+<!-- 3–6 sentences. How does build-with enablement happen? What gets measured? -->
 
 ### How to try it
 
@@ -23,15 +27,16 @@ npm install
 npm run dev
 ```
 
-<!-- Steps to see your change in a run -->
+<!-- Steps to see your change -->
 
 ### Loom (optional)
 
-<!-- Paste link if you recorded a walkthrough instead of / in addition to the PR -->
+<!-- Paste link if you recorded a walkthrough -->
 
 ### Rubric self-check
 
 - [ ] Names a real struggling moment
-- [ ] Mechanic or teaching value is clear in play
-- [ ] Change is small and shippable
+- [ ] Artifact is specific to a codebase/org
+- [ ] Clear ownership path for the team
+- [ ] Hints at what would change if it worked
 - [ ] `npm run lint` / `npm run build` pass (or note why not)

@@ -1,0 +1,82 @@
+// .cursorrules
+// This file is an exemplar of what an AI Adoption Engineer leaves behind:
+// specific, opinionated, repo-shaped, and extendable.
+// Reading this is doing the job.
+
+// -- ENGINE ARCHITECTURE --
+// src/game/engine.ts owns all state. React reads GameSnapshot via a hook (~7Hz).
+// If you're adding game logic: engine.ts first.
+// If you're wiring UI to state: React components read the snapshot, never mutate state directly.
+
+// -- ROLE & ARTIFACTS --
+// Cursteroids is a recruiting game for AI Adoption Engineers.
+// Role DNA: Credibility from what you ship alongside the team, not from what you present to them.
+// What we build: Rules libraries, prompt architectures, MCP configs, dashboards, Cloud Agents, enablement guides.
+// These are not generic best-practices docs. They are specific to the target team's codebase, stack, and workflows.
+// See src/game/roles/ai-adoption-engineer.ts for canonical role content.
+
+// -- BLOCKERS & MECHANICS --
+// src/game/blockers.ts defines adoption blockers (e.g. "low trust in AI", "unclear ROI").
+// Each blocker has a label, fragments (thematic hits), and a mechanic (none | armored | regen | drain | convert).
+// convert-type blockers ("low trust in AI", "IDE skepticism") cannot be shot dead — fly alongside
+// them to pair and convert them into allies. That asymmetry is the whole point of the role.
+// When adding a new blocker: update ADOPTION_BLOCKERS array, include a hint (teach the player why it matters).
+
+// -- DIALOGUE & ACCOUNT DESK --
+// src/game/dialogue.ts holds all copy: Account Desk huddle, phase retros, debrief scripting.
+// Dialogue keys are stable; they gate which artifact choices appear in each phase.
+// Account Desk is a scripted ADM huddle. Choices are artifacts (Rules, MCP, Cloud Agent, dashboard), not event formats.
+// Phase retros ask: which moment was hardest, what intervention, what leave-behind artifact?
+// Answers feed the scorecard and LinkedIn share card (src/game/share.ts).
+
+// -- CONSTANTS & PALETTE --
+// src/game/constants.ts: game balance (ship radius, bullet speed, powerup duration, etc.) and URLs.
+// Colors live ONLY in engine.ts gamePalettes (light and dark).
+// Every new color must be added to BOTH light and dark palettes as key-value pairs.
+// Do not hardcode colors anywhere else.
+
+// -- POWERUPS --
+// src/game/powerups.ts defines what artifacts do when picked up:
+// Rules = PERSISTENT: the most common blocker label spawns pre-weakened for the rest of the run (stacks per label)
+// MCP = timed: wider hit radius + wider Tab-suggestion cone (POWERUP_DURATION)
+// Cloud Agent = banks a deploy charge (max AGENT_MAX_CHARGES); press E to launch a drone at chore blockers
+// Dashboard = timed: pauses ROI drain (unclear ROI is the drain-type blocker)
+// The mechanics ARE the teaching: rules outlive the session, agents take the toil, dashboards stop the bleed.
+
+// -- RESUME FEEDBACK --
+// src/app/api/resume-feedback/route.ts evals resumes against six dimensions:
+// technical_architecture, systems_thinking, build_with_enablement, measurement, artifact_craft, change_practice.
+// This is advisory only. Resumes are not stored. See src/game/roles/ai-adoption-engineer.ts for the rubric.
+
+// -- CHALLENGE & PR TEMPLATE --
+// The artifact challenge asks: ship one adoption artifact sample.
+// Rubric (src/game/challenge.ts): struggling moment (real org gap), artifact specificity (grounded in codebase),
+// build-with ownership, measurability, shippability.
+// See .github/pull_request_template.md for what recruiting signals look for.
+
+// -- FILE ORGANIZATION --
+// src/game/ = game logic, rules, copy, types
+// src/components/ = React UI (read GameSnapshot, never mutate)
+// src/app/ = Next.js App Router (pages, API routes)
+// Everything else: src/app or src/game
+
+// -- TYPESCRIPT --
+// Strict mode always. Use `as const` for string literals that gate behavior.
+// Game types live in src/game/types.ts. Import liberally.
+// No `any` without a /* eslint-disable */ comment and a reason.
+
+// -- MUI CONVENTIONS --
+// Use Box, Button, Typography, Card from @mui/material.
+// Palette is hardcoded in component styles; reference colors from gamePalettes.
+// Layout: flexbox for positioning. No absolute positioning unless game-canvas-specific.
+// Button variants: "contained" for primary actions, "outlined" for secondary, "text" for tertiary.
+
+// -- NEXT.JS GOTCHAS --
+// This is NOT the Next.js you trained on. Read node_modules/next/dist/docs before each major change.
+// App Router (not Pages Router). Route handlers use Response.json(), not res.json().
+// Layout.tsx wraps every page. Changes there affect everything.
+
+// -- GIT & PRs --
+// Branch naming: feature/*, bugfix/*, chore/*.
+// PR template is .github/pull_request_template.md.
+// Artifact challenge PRs should link to the role and clearly state the artifact type.

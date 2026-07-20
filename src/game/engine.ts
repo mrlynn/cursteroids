@@ -1,15 +1,29 @@
 import { getBlocker, getBlockerByLabel, hitPointsForMechanic } from "@/game/blockers";
-import { waveBriefForLevel, isFinalPhase } from "@/game/campaign";
+import { isFinalPhase, WAVE_BRIEFS, waveBriefForLevel } from "@/game/campaign";
 import {
+  AGENT_CHORE_PATTERN,
+  AGENT_CHORE_RADIUS,
+  AGENT_DEPLOY_DURATION,
+  AGENT_MAX_CHARGES,
+  AGENT_MAX_KILLS,
+  AGENT_SPEED,
   BULLET_LIFE,
   BULLET_SPEED,
   CAMPAIGN_PHASES,
+  CONVERTED_DURATION,
+  CONVERTED_SPEED,
   CURSOR_TIP_ANGLE,
   CURSOR_TIP_OFFSET,
   DRAIN_PER_SECOND,
   DRAIN_RADIUS,
-  INITIAL_LIVES,
+  HIT_STOP_DURATION,
+  HIT_STOP_TIMESCALE,
+  LARGE_BLOCKER_RADIUS,
+  MISS_STREAK_THRESHOLD,
   NEAR_MISS_GAP,
+  PAIRING_DECAY_RATE,
+  PAIRING_RADIUS,
+  PAIRING_TIME,
   POWERUP_DROP_CHANCE,
   POWERUP_RADIUS,
   REGEN_WINDOW,
@@ -18,18 +32,29 @@ import {
   SHOT_COOLDOWN,
   START_HEIGHT,
   START_WIDTH,
-  TAB_SHOT_COOLDOWN,
+  TAB_CONE_HALF_ANGLE,
+  TAB_CONE_HALF_ANGLE_WIDE,
+  TAB_FIRE_COOLDOWN,
+  TAB_TRACER_LIFE,
+  TRUST_CONVERT_BONUS,
+  TRUST_HIT_PENALTY,
+  TRUST_MAX,
+  TRUST_OVERCLAIM_PENALTY,
+  TRUST_PHASE_CLEAR_BONUS,
+  TRUST_START,
   TWOPI,
+  WAVE_INTRO_DURATION,
 } from "@/game/constants";
-import { distance, randomBetween, rotateVector, wrapPosition } from "@/game/math";
+import type { InputIntent } from "@/game/input";
+import { angleDiff, clamp, distance, normalize, randomBetween, rotateVector, wrapPosition } from "@/game/math";
+import { modifierForIntervention, modifierHudLabel, modifierWaveToast } from "@/game/modifiers";
 import {
   activePowerupLabel,
   applyPowerup,
   createPowerup,
   emptyEffects,
-  hasAgentAssist,
-  hasRulesShield,
-  hasTabBoost,
+  hasDashboard,
+  hasMcpBoost,
   POWERUP_KINDS,
 } from "@/game/powerups";
 import type {
@@ -37,6 +62,7 @@ import type {
   Bullet,
   GameSnapshot,
   GameState,
+  PhaseDebriefRecord,
   Ship,
   Vector,
 } from "@/game/types";
@@ -129,27 +155,45 @@ export function createInitialGame(): GameState {
     ship: createShip(START_WIDTH, START_HEIGHT),
     asteroids: [],
     bullets: [],
+    tracers: [],
     particles: [],
     powerups: [],
     effects: emptyEffects(),
-    keys: new Set<string>(),
+    agent: null,
     score: 0,
     highScore: 0,
-    lives: INITIAL_LIVES,
+    trust: TRUST_START,
     level: 1,
     shots: 0,
     hits: 0,
+    missStreak: 0,
     nearMisses: 0,
+    tabAccepts: 0,
+    conversions: 0,
+    agentDeploys: 0,
     blockersCleared: {},
     powerupsCollected: 0,
     powerupsUsedWell: 0,
     lastShotAt: 0,
+    lastTabAcceptAt: 0,
     invincibleUntil: 0,
     nextAsteroidId: 1,
     nextPowerupId: 1,
     snapshotTimer: 0,
     toast: null,
     toastUntil: 0,
+    debriefs: [],
+    debriefPhase: 0,
+    pendingMissionComplete: false,
+    suggestionTargetId: null,
+    waveModifier: null,
+    waveModifierLabel: null,
+    waveIntroUntil: 0,
+    shakeUntil: 0,
+    shakeDuration: 0,
+    shakeStrength: 0,
+    hitStopUntil: 0,
+    thrusting: false,
   };
 }
 
@@ -158,17 +202,32 @@ export function getSnapshot(game: GameState, now = 0): GameSnapshot {
     status: game.status,
     score: game.score,
     highScore: game.highScore,
-    lives: game.lives,
+    trust: game.trust,
     level: game.level,
     asteroids: game.asteroids.length,
     accuracy: game.shots === 0 ? 100 : Math.round((game.hits / game.shots) * 100),
     nearMisses: game.nearMisses,
+    tabAccepts: game.tabAccepts,
+    conversions: game.conversions,
+    agentDeploys: game.agentDeploys,
+    agentCharges: game.effects.agentCharges,
+    rulesCoverageCount: Object.keys(game.effects.rulesCoverage).length,
     blockersCleared: { ...game.blockersCleared },
     powerupsCollected: game.powerupsCollected,
     powerupsUsedWell: game.powerupsUsedWell,
     activePowerup: activePowerupLabel(game.effects, now),
     toast: now < game.toastUntil ? game.toast : null,
+    debriefs: [...game.debriefs],
+    debriefPhase: game.debriefPhase,
+    waveModifierLabel: game.waveModifier
+      ? modifierHudLabel(game.waveModifier, game.waveModifierLabel)
+      : null,
   };
+}
+
+/** Timescale multiplier the caller should apply to `delta` this frame. */
+export function timeScaleFor(game: GameState, now: number): number {
+  return now < game.hitStopUntil ? HIT_STOP_TIMESCALE : 1;
 }
 
 function getCursorTipPosition(ship: Ship): Vector {
@@ -199,7 +258,17 @@ function createAsteroid(
   const blocker = label ? getBlockerByLabel(label) : getBlocker(game.nextAsteroidId + game.level);
   const resolvedLabel = label ?? blocker?.label ?? "context chaos";
   const mechanic = blocker?.mechanic ?? "none";
-  const hitPoints = hitPointsForMechanic(mechanic);
+
+  let hitPoints = hitPointsForMechanic(mechanic);
+  let finalRadius = radius;
+  let preWeakened = false;
+
+  if (mechanic !== "convert" && game.effects.rulesCoverage[resolvedLabel]) {
+    hitPoints = Math.max(1, hitPoints - 1);
+    finalRadius = radius * 0.82;
+    preWeakened = true;
+  }
+
   const speedBoost = mechanic === "drain" ? 18 : 0;
   const speed = randomBetween(28, 76) + game.level * 5 + speedBoost;
   const angle = randomBetween(0, TWOPI);
@@ -212,7 +281,7 @@ function createAsteroid(
       x: Math.cos(angle) * speed,
       y: Math.sin(angle) * speed,
     },
-    radius,
+    radius: finalRadius,
     label: resolvedLabel,
     points: Array.from({ length: vertexCount }, () => randomBetween(0.72, 1.22)),
     rotation: randomBetween(0, TWOPI),
@@ -222,14 +291,18 @@ function createAsteroid(
     maxHitPoints: hitPoints,
     firstHitAt: 0,
     cracked: false,
+    pairing: 0,
+    converted: false,
+    convertedUntil: 0,
+    preWeakened,
+    hintShown: false,
   };
 }
 
 export function spawnWave(game: GameState) {
   const count = Math.min(4 + game.level, 9);
-  const wave: Asteroid[] = [];
+  game.waveModifierLabel = null;
 
-  // Guarantee distinctive blockers appear in the campaign.
   const featured =
     game.level === 1
       ? "low trust in AI"
@@ -239,15 +312,45 @@ export function spawnWave(game: GameState) {
           ? "unclear ROI"
           : null;
 
+  // Predetermine the label sequence so a "rules" modifier can weaken the
+  // wave's most common label before any asteroid actually spawns.
+  const labels: string[] = [];
   if (featured) {
-    wave.push(createAsteroid(game, randomBetween(44, 62), undefined, featured));
+    labels.push(featured);
+  }
+  let cursor = game.nextAsteroidId;
+  while (labels.length < count) {
+    labels.push(getBlocker(cursor + game.level).label);
+    cursor += 1;
   }
 
-  while (wave.length < count) {
-    wave.push(createAsteroid(game, randomBetween(38, 62)));
+  if (game.waveModifier === "rules") {
+    const counts = new Map<string, number>();
+    for (const label of labels) {
+      counts.set(label, (counts.get(label) ?? 0) + 1);
+    }
+    let modeLabel: string | null = null;
+    let modeCount = 0;
+    for (const [label, n] of counts) {
+      if (n > modeCount) {
+        modeLabel = label;
+        modeCount = n;
+      }
+    }
+    if (modeLabel) {
+      game.effects.rulesCoverage[modeLabel] = true;
+      game.waveModifierLabel = modeLabel;
+    }
   }
 
-  game.asteroids = wave;
+  game.asteroids = labels.map((label, index) =>
+    createAsteroid(
+      game,
+      index === 0 && featured ? randomBetween(44, 62) : randomBetween(38, 62),
+      undefined,
+      label,
+    ),
+  );
 }
 
 export function resetShip(game: GameState, now: number) {
@@ -277,6 +380,19 @@ function emitParticles(
   }
 }
 
+function triggerShake(game: GameState, now: number, strength: number, duration: number) {
+  game.shakeUntil = now + duration;
+  game.shakeDuration = duration;
+  game.shakeStrength = strength;
+}
+
+function applyTrustDelta(game: GameState, delta: number) {
+  game.trust = clamp(game.trust + delta, 0, TRUST_MAX);
+  if (game.trust <= 0 && game.status === "playing") {
+    game.status = "gameOver";
+  }
+}
+
 function maybeDropPowerup(game: GameState, position: Vector) {
   if (Math.random() > POWERUP_DROP_CHANCE) {
     return;
@@ -289,15 +405,29 @@ function recordClear(game: GameState, label: string) {
   game.blockersCleared[label] = (game.blockersCleared[label] ?? 0) + 1;
 }
 
-function destroyAsteroid(game: GameState, asteroid: Asteroid, spawnedAsteroids: Asteroid[]) {
-  game.hits += 1;
+function destroyAsteroid(
+  game: GameState,
+  asteroid: Asteroid,
+  spawnedAsteroids: Asteroid[],
+  now: number,
+) {
   const bonus =
-    asteroid.mechanic === "armored" ? 40 : asteroid.mechanic === "regen" ? 55 : asteroid.mechanic === "drain" ? 70 : 0;
+    asteroid.mechanic === "armored"
+      ? 40
+      : asteroid.mechanic === "regen"
+        ? 55
+        : asteroid.mechanic === "drain"
+          ? 70
+          : 0;
   game.score += Math.round((80 - asteroid.radius) * 5 + game.level * 25 + bonus);
   game.highScore = Math.max(game.highScore, game.score);
   emitParticles(game, asteroid.position, 18, palette.accent, 190);
   recordClear(game, asteroid.label);
   maybeDropPowerup(game, asteroid.position);
+
+  if (asteroid.radius > LARGE_BLOCKER_RADIUS) {
+    triggerShake(game, now, 8, 0.3);
+  }
 
   if (asteroid.radius > 26) {
     const blocker = getBlockerByLabel(asteroid.label);
@@ -309,37 +439,71 @@ function destroyAsteroid(game: GameState, asteroid: Asteroid, spawnedAsteroids: 
   }
 }
 
+type HitOutcome = "destroyed" | "cracked" | "blocked";
+
+/** Applies bullet/tab damage to a blocker, mutating it in place. */
+function applyHitToAsteroid(game: GameState, asteroid: Asteroid, now: number): HitOutcome {
+  if (asteroid.mechanic === "convert") {
+    if (!asteroid.hintShown) {
+      asteroid.hintShown = true;
+      game.toast = "Won't break — pair with it.";
+      game.toastUntil = now + 2.6;
+    }
+    const angle = randomBetween(0, TWOPI);
+    asteroid.velocity.x += Math.cos(angle) * 40;
+    asteroid.velocity.y += Math.sin(angle) * 40;
+    emitParticles(game, asteroid.position, 6, palette.muted, 90);
+    game.hits += 1;
+    game.missStreak = 0;
+    return "blocked";
+  }
+
+  if (asteroid.mechanic === "armored" && asteroid.hitPoints > 1) {
+    asteroid.hitPoints -= 1;
+    asteroid.cracked = true;
+    asteroid.firstHitAt = now;
+    emitParticles(game, asteroid.position, 10, palette.muted, 120);
+    game.hits += 1;
+    game.missStreak = 0;
+    return "cracked";
+  }
+
+  if (asteroid.mechanic === "regen" && !asteroid.cracked) {
+    asteroid.cracked = true;
+    asteroid.firstHitAt = now;
+    asteroid.hitPoints = 0;
+    emitParticles(game, asteroid.position, 10, palette.danger, 120);
+    game.hits += 1;
+    game.missStreak = 0;
+    return "cracked";
+  }
+
+  game.hits += 1;
+  game.missStreak = 0;
+  return "destroyed";
+}
+
 function fireBullet(game: GameState, now: number) {
-  const cooldown = hasTabBoost(game.effects, now) ? TAB_SHOT_COOLDOWN : SHOT_COOLDOWN;
-  if (now - game.lastShotAt < cooldown) {
+  if (now - game.lastShotAt < SHOT_COOLDOWN) {
     return;
   }
 
   game.lastShotAt = now;
   game.shots += 1;
+  game.missStreak += 1;
+
+  if (game.missStreak >= MISS_STREAK_THRESHOLD) {
+    applyTrustDelta(game, -TRUST_OVERCLAIM_PENALTY);
+    game.toast = "Overclaiming burns trust";
+    game.toastUntil = now + 2.2;
+    game.missStreak = 0;
+  }
 
   const nose = getCursorTipPosition(game.ship);
   nose.x += Math.cos(game.ship.angle) * 4;
   nose.y += Math.sin(game.ship.angle) * 4;
 
-  let angle = game.ship.angle;
-  if (hasAgentAssist(game.effects, now) && game.asteroids.length > 0) {
-    let nearest = game.asteroids[0];
-    let nearestDist = distance(game.ship.position, nearest.position);
-    for (const asteroid of game.asteroids) {
-      const dist = distance(game.ship.position, asteroid.position);
-      const weight = asteroid.mechanic !== "none" ? 0.82 : 1;
-      const scored = dist * weight;
-      if (scored < nearestDist) {
-        nearest = asteroid;
-        nearestDist = scored;
-      }
-    }
-    angle = Math.atan2(
-      nearest.position.y - game.ship.position.y,
-      nearest.position.x - game.ship.position.x,
-    );
-  }
+  const angle = game.ship.angle;
 
   game.bullets.push({
     position: nose,
@@ -351,33 +515,169 @@ function fireBullet(game: GameState, now: number) {
   });
 }
 
-function applyAgentSteering(game: GameState, delta: number, now: number) {
-  if (!hasAgentAssist(game.effects, now) || game.asteroids.length === 0) {
-    return;
+/** Finds the best Tab-fire target: nearest in a forward cone, else nearest overall. */
+function computeSuggestionTarget(game: GameState, now: number): Asteroid | null {
+  // Never suggest convert-type blockers: the whole lesson is that you pair
+  // with those instead of shooting them. If only convert blockers remain,
+  // suggest nothing — the dotted line going quiet is itself the hint.
+  const candidates = game.asteroids.filter(
+    (asteroid) => !asteroid.converted && asteroid.mechanic !== "convert",
+  );
+  if (candidates.length === 0) {
+    return null;
   }
 
-  let nearest = game.asteroids[0];
-  let nearestDist = Infinity;
-  for (const asteroid of game.asteroids) {
-    const dist = distance(game.ship.position, asteroid.position);
-    const weight = asteroid.mechanic !== "none" ? 0.75 : 1;
-    if (dist * weight < nearestDist) {
-      nearest = asteroid;
-      nearestDist = dist * weight;
+  const widened = hasMcpBoost(game.effects, now) || game.waveModifier === "mcp";
+  const coneHalf = widened ? TAB_CONE_HALF_ANGLE_WIDE : TAB_CONE_HALF_ANGLE;
+
+  let best: Asteroid | null = null;
+  let bestDist = Infinity;
+
+  for (const asteroid of candidates) {
+    const dx = asteroid.position.x - game.ship.position.x;
+    const dy = asteroid.position.y - game.ship.position.y;
+    const dist = Math.hypot(dx, dy);
+    const angleTo = Math.atan2(dy, dx);
+    const diff = Math.abs(angleDiff(game.ship.angle, angleTo));
+    if (diff <= coneHalf && dist < bestDist) {
+      best = asteroid;
+      bestDist = dist;
     }
   }
 
-  const desired = Math.atan2(
-    nearest.position.y - game.ship.position.y,
-    nearest.position.x - game.ship.position.x,
-  );
-  let diff = desired - game.ship.angle;
-  while (diff > Math.PI) diff -= TWOPI;
-  while (diff < -Math.PI) diff += TWOPI;
-  game.ship.angle += Math.max(-2.8, Math.min(2.8, diff)) * delta * 1.6;
+  if (best) {
+    return best;
+  }
+
+  for (const asteroid of candidates) {
+    const dist = distance(game.ship.position, asteroid.position);
+    if (dist < bestDist) {
+      best = asteroid;
+      bestDist = dist;
+    }
+  }
+
+  return best;
 }
 
-export function updatePlaying(game: GameState, delta: number, now: number) {
+function acceptTabSuggestion(game: GameState, now: number) {
+  if (now - game.lastTabAcceptAt < TAB_FIRE_COOLDOWN) {
+    return;
+  }
+  const target = game.asteroids.find(
+    (asteroid) => asteroid.id === game.suggestionTargetId && !asteroid.converted,
+  );
+  if (!target) {
+    return;
+  }
+
+  game.lastTabAcceptAt = now;
+  game.tabAccepts += 1;
+  game.shots += 1;
+
+  game.tracers.push({
+    from: { ...game.ship.position },
+    to: { ...target.position },
+    life: TAB_TRACER_LIFE,
+    maxLife: TAB_TRACER_LIFE,
+    tab: true,
+  });
+
+  const outcome = applyHitToAsteroid(game, target, now);
+  if (outcome === "destroyed") {
+    const spawned: Asteroid[] = [];
+    destroyAsteroid(game, target, spawned, now);
+    game.asteroids = game.asteroids.filter((asteroid) => asteroid.id !== target.id).concat(spawned);
+    game.hitStopUntil = now + HIT_STOP_DURATION;
+    triggerShake(game, now, 4, 0.18);
+  }
+}
+
+function deployAgentDrone(game: GameState, now: number) {
+  if (game.effects.agentCharges <= 0 || game.agent) {
+    return;
+  }
+  game.effects.agentCharges -= 1;
+  game.agent = {
+    position: { ...game.ship.position },
+    velocity: { x: 0, y: 0 },
+    targetId: null,
+    until: now + AGENT_DEPLOY_DURATION,
+    kills: 0,
+    trail: [],
+  };
+  game.agentDeploys += 1;
+  game.toast = "Agent running — you handle the judgment calls.";
+  game.toastUntil = now + 2.6;
+}
+
+function isChoreBlocker(asteroid: Asteroid): boolean {
+  return (
+    !asteroid.converted &&
+    (asteroid.radius < AGENT_CHORE_RADIUS || AGENT_CHORE_PATTERN.test(asteroid.label))
+  );
+}
+
+function updateAgentDrone(game: GameState, delta: number, now: number) {
+  const agent = game.agent;
+  if (!agent) {
+    return;
+  }
+
+  agent.trail.push({ ...agent.position });
+  if (agent.trail.length > 14) {
+    agent.trail.shift();
+  }
+
+  if (now > agent.until || agent.kills >= AGENT_MAX_KILLS) {
+    game.agent = null;
+    return;
+  }
+
+  let target =
+    agent.targetId != null ? game.asteroids.find((asteroid) => asteroid.id === agent.targetId) : undefined;
+  if (!target || !isChoreBlocker(target)) {
+    target = game.asteroids
+      .filter(isChoreBlocker)
+      .sort((a, b) => distance(agent.position, a.position) - distance(agent.position, b.position))[0];
+    agent.targetId = target?.id ?? null;
+  }
+
+  if (target) {
+    const dir = normalize({
+      x: target.position.x - agent.position.x,
+      y: target.position.y - agent.position.y,
+    });
+    agent.velocity = { x: dir.x * AGENT_SPEED, y: dir.y * AGENT_SPEED };
+    agent.position.x += agent.velocity.x * delta;
+    agent.position.y += agent.velocity.y * delta;
+
+    if (distance(agent.position, target.position) < target.radius + 10) {
+      const clearedLabel = target.label;
+      const clearedPosition = target.position;
+      game.asteroids = game.asteroids.filter((asteroid) => asteroid.id !== target!.id);
+      game.score += 90;
+      game.highScore = Math.max(game.highScore, game.score);
+      recordClear(game, clearedLabel);
+      emitParticles(game, clearedPosition, 14, palette.powerup, 150);
+      agent.kills += 1;
+      agent.targetId = null;
+    }
+  } else {
+    const ease = Math.min(1, delta * 1.5);
+    agent.position.x += (game.ship.position.x - agent.position.x) * ease;
+    agent.position.y += (game.ship.position.y - agent.position.y) * ease;
+  }
+}
+
+function allyDestroyHostile(game: GameState, hostile: Asteroid) {
+  game.score += 60;
+  game.highScore = Math.max(game.highScore, game.score);
+  recordClear(game, hostile.label);
+  emitParticles(game, hostile.position, 14, palette.powerup, 150);
+}
+
+export function updatePlaying(game: GameState, delta: number, now: number, intent: InputIntent) {
   const ship = game.ship;
   const turn = 4.9;
   const thrust = 430;
@@ -386,15 +686,15 @@ export function updatePlaying(game: GameState, delta: number, now: number) {
     game.toast = null;
   }
 
-  applyAgentSteering(game, delta, now);
-
-  if (game.keys.has("ArrowLeft") || game.keys.has("KeyA")) {
+  if (intent.turnLeft) {
     ship.angle -= turn * delta;
   }
-  if (game.keys.has("ArrowRight") || game.keys.has("KeyD")) {
+  if (intent.turnRight) {
     ship.angle += turn * delta;
   }
-  if (game.keys.has("ArrowUp") || game.keys.has("KeyW")) {
+
+  game.thrusting = intent.thrust;
+  if (intent.thrust) {
     ship.velocity.x += Math.cos(ship.angle) * thrust * delta;
     ship.velocity.y += Math.sin(ship.angle) * thrust * delta;
     emitParticles(
@@ -408,8 +708,14 @@ export function updatePlaying(game: GameState, delta: number, now: number) {
       80,
     );
   }
-  if (game.keys.has("Space")) {
+  if (intent.firePrimary) {
     fireBullet(game, now);
+  }
+  if (intent.acceptTab) {
+    acceptTabSuggestion(game, now);
+  }
+  if (intent.deployAgent) {
+    deployAgentDrone(game, now);
   }
 
   ship.velocity.x *= 0.992;
@@ -433,6 +739,13 @@ export function updatePlaying(game: GameState, delta: number, now: number) {
     wrapPosition(bullet.position, game.width, game.height);
   }
 
+  game.tracers = game.tracers
+    .map((tracer) => ({ ...tracer, life: tracer.life - delta }))
+    .filter((tracer) => tracer.life > 0);
+
+  const destroyedAsteroids = new Set<Asteroid>();
+  const spawnedAsteroids: Asteroid[] = [];
+
   for (const asteroid of game.asteroids) {
     asteroid.position.x += asteroid.velocity.x * delta;
     asteroid.position.y += asteroid.velocity.y * delta;
@@ -448,14 +761,85 @@ export function updatePlaying(game: GameState, delta: number, now: number) {
       }
     }
 
-    if (asteroid.mechanic === "drain") {
+    if (asteroid.mechanic === "drain" && !hasDashboard(game.effects, now)) {
       const dist = distance(ship.position, asteroid.position);
       if (dist < DRAIN_RADIUS) {
         const falloff = 1 - dist / DRAIN_RADIUS;
-        game.score = Math.max(0, game.score - DRAIN_PER_SECOND * falloff * delta);
+        const rate = DRAIN_PER_SECOND * (game.waveModifier === "dashboard" ? 0.5 : 1);
+        game.score = Math.max(0, game.score - rate * falloff * delta);
       }
     }
   }
+
+  // Blocker conversion (pairing): accumulate/decay progress, flip at 100%.
+  for (const asteroid of game.asteroids) {
+    if (asteroid.mechanic !== "convert" || asteroid.converted) {
+      continue;
+    }
+    const dist = distance(ship.position, asteroid.position);
+    if (dist < PAIRING_RADIUS) {
+      asteroid.pairing = Math.min(1, asteroid.pairing + delta / PAIRING_TIME);
+    } else {
+      asteroid.pairing = Math.max(0, asteroid.pairing - delta * PAIRING_DECAY_RATE);
+    }
+
+    if (asteroid.pairing >= 1) {
+      asteroid.converted = true;
+      asteroid.convertedUntil = now + CONVERTED_DURATION;
+      asteroid.hitPoints = 999;
+      asteroid.maxHitPoints = 999;
+      emitParticles(game, asteroid.position, 26, palette.powerup, 210);
+      applyTrustDelta(game, TRUST_CONVERT_BONUS);
+      game.conversions += 1;
+      game.toast = "Converted: built WITH them, not in front of them.";
+      game.toastUntil = now + 2.8;
+    }
+  }
+
+  // Converted allies hunt hostile blockers for a limited window, then despawn.
+  for (const asteroid of game.asteroids) {
+    if (!asteroid.converted || destroyedAsteroids.has(asteroid)) {
+      continue;
+    }
+    if (now > asteroid.convertedUntil) {
+      destroyedAsteroids.add(asteroid);
+      emitParticles(game, asteroid.position, 10, palette.powerup, 90);
+      continue;
+    }
+
+    let nearest: Asteroid | null = null;
+    let nearestDist = Infinity;
+    for (const other of game.asteroids) {
+      if (other === asteroid || other.mechanic === "convert" || destroyedAsteroids.has(other)) {
+        continue;
+      }
+      const dist = distance(asteroid.position, other.position);
+      if (dist < nearestDist) {
+        nearest = other;
+        nearestDist = dist;
+      }
+    }
+
+    if (nearest) {
+      const dir = normalize({
+        x: nearest.position.x - asteroid.position.x,
+        y: nearest.position.y - asteroid.position.y,
+      });
+      asteroid.velocity.x += dir.x * CONVERTED_SPEED * delta * 1.5;
+      asteroid.velocity.y += dir.y * CONVERTED_SPEED * delta * 1.5;
+      const speed = Math.hypot(asteroid.velocity.x, asteroid.velocity.y) || 1;
+      if (speed > CONVERTED_SPEED) {
+        asteroid.velocity.x = (asteroid.velocity.x / speed) * CONVERTED_SPEED;
+        asteroid.velocity.y = (asteroid.velocity.y / speed) * CONVERTED_SPEED;
+      }
+      if (nearestDist < asteroid.radius + nearest.radius * 0.7) {
+        destroyedAsteroids.add(nearest);
+        allyDestroyHostile(game, nearest);
+      }
+    }
+  }
+
+  updateAgentDrone(game, delta, now);
 
   game.powerups = game.powerups
     .map((powerup) => ({
@@ -486,45 +870,22 @@ export function updatePlaying(game: GameState, delta: number, now: number) {
   game.powerups = remainingPowerups;
 
   const destroyedBullets = new Set<Bullet>();
-  const destroyedAsteroids = new Set<Asteroid>();
-  const spawnedAsteroids: Asteroid[] = [];
 
   for (const bullet of game.bullets) {
     for (const asteroid of game.asteroids) {
-      if (destroyedAsteroids.has(asteroid)) {
+      if (destroyedAsteroids.has(asteroid) || asteroid.converted) {
         continue;
       }
 
-      if (distance(bullet.position, asteroid.position) < asteroid.radius) {
+      const hitRadius = hasMcpBoost(game.effects, now) ? asteroid.radius * 1.35 : asteroid.radius;
+
+      if (distance(bullet.position, asteroid.position) < hitRadius) {
         destroyedBullets.add(bullet);
-
-        if (asteroid.mechanic === "armored" && asteroid.hitPoints > 1) {
-          asteroid.hitPoints -= 1;
-          asteroid.cracked = true;
-          asteroid.firstHitAt = now;
-          emitParticles(game, asteroid.position, 10, palette.muted, 120);
-          game.hits += 1;
-          break;
-        }
-
-        if (asteroid.mechanic === "regen" && !asteroid.cracked) {
-          asteroid.cracked = true;
-          asteroid.firstHitAt = now;
-          asteroid.hitPoints = 0;
-          emitParticles(game, asteroid.position, 10, palette.danger, 120);
-          game.hits += 1;
-          // First hit only cracks; second hit in window destroys.
-          break;
-        }
-
-        if (asteroid.mechanic === "regen" && asteroid.cracked) {
+        const outcome = applyHitToAsteroid(game, asteroid, now);
+        if (outcome === "destroyed") {
           destroyedAsteroids.add(asteroid);
-          destroyAsteroid(game, asteroid, spawnedAsteroids);
-          break;
+          destroyAsteroid(game, asteroid, spawnedAsteroids, now);
         }
-
-        destroyedAsteroids.add(asteroid);
-        destroyAsteroid(game, asteroid, spawnedAsteroids);
         break;
       }
     }
@@ -535,9 +896,14 @@ export function updatePlaying(game: GameState, delta: number, now: number) {
     .filter((asteroid) => !destroyedAsteroids.has(asteroid))
     .concat(spawnedAsteroids);
 
+  game.suggestionTargetId = computeSuggestionTarget(game, now)?.id ?? null;
+
   // Approximate near-misses for the trust dimension (close passes that did not hit).
-  if (now > game.invincibleUntil && !hasRulesShield(game.effects, now)) {
+  if (now > game.invincibleUntil) {
     for (const asteroid of game.asteroids) {
+      if (asteroid.converted) {
+        continue;
+      }
       const dist = distance(ship.position, asteroid.position);
       const hitRadius = ship.radius + asteroid.radius * 0.82;
       if (dist > hitRadius && dist < hitRadius + NEAR_MISS_GAP && Math.random() < delta * 1.8) {
@@ -546,46 +912,65 @@ export function updatePlaying(game: GameState, delta: number, now: number) {
     }
   }
 
-  const shielded = hasRulesShield(game.effects, now);
   if (now > game.invincibleUntil) {
     const shipHit = game.asteroids.some(
-      (asteroid) => distance(ship.position, asteroid.position) < ship.radius + asteroid.radius * 0.82,
+      (asteroid) =>
+        !asteroid.converted &&
+        distance(ship.position, asteroid.position) < ship.radius + asteroid.radius * 0.82,
     );
 
     if (shipHit) {
-      if (shielded) {
-        emitParticles(game, ship.position, 16, palette.powerup, 160);
-        game.effects.rulesUntil = Math.min(game.effects.rulesUntil, now + 0.15);
-        game.invincibleUntil = now + 1.1;
-        game.powerupsUsedWell += 1;
-      } else {
-        emitParticles(game, ship.position, 34, palette.danger, 220);
-        game.lives -= 1;
-        game.bullets = [];
+      emitParticles(game, ship.position, 34, palette.danger, 220);
+      triggerShake(game, now, 10, 0.4);
+      game.bullets = [];
+      applyTrustDelta(game, -TRUST_HIT_PENALTY);
 
-        if (game.lives <= 0) {
-          game.status = "gameOver";
-        } else {
-          resetShip(game, now);
-        }
+      if (game.trust <= 0) {
+        game.status = "gameOver";
+      } else {
+        resetShip(game, now);
       }
     }
   }
 
   if (game.status === "playing" && game.asteroids.length === 0) {
-    if (isFinalPhase(game.level)) {
-      game.status = "missionComplete";
-      game.toast = "Mission complete. Prove it in the builder challenge.";
-      game.toastUntil = now + 4;
-      return;
-    }
-
-    game.level += 1;
-    resetShip(game, now);
-    spawnWave(game);
-    game.toast = waveBriefForLevel(game.level);
-    game.toastUntil = now + 2.2;
+    game.bullets = [];
+    game.powerups = [];
+    game.agent = null;
+    applyTrustDelta(game, TRUST_PHASE_CLEAR_BONUS);
+    game.debriefPhase = game.level;
+    game.pendingMissionComplete = isFinalPhase(game.level);
+    game.status = "debriefing";
+    game.toast = "Phase clear — quick retro before you continue.";
+    game.toastUntil = now + 2.5;
   }
+}
+
+export function completeDebrief(game: GameState, debrief: PhaseDebriefRecord, now: number) {
+  game.debriefs = [...game.debriefs.filter((item) => item.phase !== debrief.phase), debrief];
+
+  if (game.pendingMissionComplete) {
+    game.pendingMissionComplete = false;
+    game.status = "missionComplete";
+    game.toast = "Mission complete. Prove it in the builder challenge.";
+    game.toastUntil = now + 4;
+    return;
+  }
+
+  const modifier = modifierForIntervention(debrief.intervention);
+  game.waveModifier = modifier;
+  if (modifier === "cloud-agent") {
+    game.effects.agentCharges = Math.min(AGENT_MAX_CHARGES, game.effects.agentCharges + 1);
+  }
+
+  game.level += 1;
+  game.status = "playing";
+  resetShip(game, now);
+  spawnWave(game);
+  game.waveIntroUntil = now + WAVE_INTRO_DURATION;
+
+  game.toast = modifierWaveToast(modifier, game.waveModifierLabel);
+  game.toastUntil = now + 3.2;
 }
 
 export function updateParticles(game: GameState, delta: number) {
@@ -709,26 +1094,13 @@ function drawShip(ctx: CanvasRenderingContext2D, game: GameState, now: number) {
     return;
   }
 
-  if (hasRulesShield(game.effects, now)) {
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(ship.position.x, ship.position.y, ship.radius + 10, 0, TWOPI);
-    ctx.strokeStyle = palette.powerup;
-    ctx.lineWidth = 2;
-    ctx.globalAlpha = 0.85;
-    ctx.stroke();
-    ctx.fillStyle = palette.shield;
-    ctx.fill();
-    ctx.restore();
-  }
-
   ctx.save();
   ctx.translate(ship.position.x, ship.position.y);
   ctx.rotate(ship.angle - CURSOR_TIP_ANGLE);
   drawCursorLogo(ctx, 0, 0, SHIP_LOGO_SIZE);
   ctx.restore();
 
-  if (game.keys.has("ArrowUp") || game.keys.has("KeyW")) {
+  if (game.thrusting) {
     ctx.save();
     ctx.translate(ship.position.x, ship.position.y);
     ctx.rotate(ship.angle);
@@ -743,7 +1115,7 @@ function drawShip(ctx: CanvasRenderingContext2D, game: GameState, now: number) {
   }
 }
 
-function drawAsteroid(ctx: CanvasRenderingContext2D, asteroid: Asteroid, now: number) {
+function drawAsteroid(ctx: CanvasRenderingContext2D, game: GameState, asteroid: Asteroid, now: number) {
   ctx.save();
   ctx.translate(asteroid.position.x, asteroid.position.y);
   ctx.rotate(asteroid.rotation);
@@ -764,7 +1136,13 @@ function drawAsteroid(ctx: CanvasRenderingContext2D, asteroid: Asteroid, now: nu
 
   ctx.closePath();
 
-  if (asteroid.mechanic === "drain") {
+  if (asteroid.converted) {
+    ctx.fillStyle = "rgba(45, 212, 191, 0.22)";
+    ctx.strokeStyle = palette.powerup;
+  } else if (asteroid.mechanic === "convert") {
+    ctx.fillStyle = "rgba(45, 212, 191, 0.1)";
+    ctx.strokeStyle = palette.powerup;
+  } else if (asteroid.mechanic === "drain") {
     ctx.fillStyle = "rgba(239, 68, 68, 0.12)";
     ctx.strokeStyle = palette.danger;
   } else if (asteroid.mechanic === "regen" && asteroid.cracked) {
@@ -778,7 +1156,7 @@ function drawAsteroid(ctx: CanvasRenderingContext2D, asteroid: Asteroid, now: nu
     ctx.strokeStyle = palette.line;
   }
 
-  ctx.lineWidth = asteroid.mechanic !== "none" ? 2.4 : 2;
+  ctx.lineWidth = asteroid.mechanic !== "none" || asteroid.converted ? 2.4 : 2;
   ctx.fill();
   ctx.stroke();
   ctx.restore();
@@ -791,6 +1169,16 @@ function drawAsteroid(ctx: CanvasRenderingContext2D, asteroid: Asteroid, now: nu
     ctx.globalAlpha = 0.12 + (Math.sin(now * 4) + 1) * 0.04;
     ctx.lineWidth = 1;
     ctx.stroke();
+
+    if (game.waveModifier === "dashboard") {
+      ctx.beginPath();
+      ctx.setLineDash([5, 5]);
+      ctx.arc(asteroid.position.x, asteroid.position.y, DRAIN_RADIUS * 1.2, 0, TWOPI);
+      ctx.globalAlpha = 0.35 + (Math.sin(now * 3) + 1) * 0.08;
+      ctx.lineWidth = 1.6;
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
     ctx.restore();
   }
 
@@ -809,6 +1197,41 @@ function drawAsteroid(ctx: CanvasRenderingContext2D, asteroid: Asteroid, now: nu
       -Math.PI / 2 + (remaining / REGEN_WINDOW) * TWOPI,
     );
     ctx.stroke();
+    ctx.restore();
+  }
+
+  if (asteroid.mechanic === "convert" && !asteroid.converted && asteroid.pairing > 0) {
+    ctx.save();
+    ctx.strokeStyle = palette.powerup;
+    ctx.globalAlpha = 0.85;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(
+      asteroid.position.x,
+      asteroid.position.y,
+      asteroid.radius + 6,
+      -Math.PI / 2,
+      -Math.PI / 2 + asteroid.pairing * TWOPI,
+    );
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  if (asteroid.preWeakened) {
+    ctx.save();
+    ctx.translate(asteroid.position.x + asteroid.radius * 0.6, asteroid.position.y - asteroid.radius * 0.6);
+    ctx.beginPath();
+    ctx.arc(0, 0, 5, 0, TWOPI);
+    ctx.fillStyle = palette.panel;
+    ctx.strokeStyle = palette.muted;
+    ctx.lineWidth = 1;
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = palette.muted;
+    ctx.font = "700 7px var(--font-geist-mono), monospace";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("R", 0, 0.5);
     ctx.restore();
   }
 
@@ -841,8 +1264,90 @@ function drawPowerup(ctx: CanvasRenderingContext2D, powerup: GameState["powerups
   ctx.font = "700 9px var(--font-geist-sans), Arial, sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  const label = powerup.kind === "Agent Mode" ? "Agent" : powerup.kind;
+  const label =
+    powerup.kind === "Cloud Agent"
+      ? "Cloud"
+      : powerup.kind === "Dashboard"
+        ? "Dash"
+        : powerup.kind;
   ctx.fillText(label, 0, 0);
+  ctx.restore();
+}
+
+function drawSuggestion(ctx: CanvasRenderingContext2D, game: GameState, now: number) {
+  if (game.status !== "playing" || game.suggestionTargetId == null) {
+    return;
+  }
+  const target = game.asteroids.find((asteroid) => asteroid.id === game.suggestionTargetId);
+  if (!target) {
+    return;
+  }
+
+  ctx.save();
+  ctx.setLineDash([4, 6]);
+  ctx.strokeStyle = palette.muted;
+  ctx.globalAlpha = 0.5 + Math.sin(now * 6) * 0.1;
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.moveTo(game.ship.position.x, game.ship.position.y);
+  ctx.lineTo(target.position.x, target.position.y);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.beginPath();
+  ctx.arc(target.position.x, target.position.y, target.radius + 8, 0, TWOPI);
+  ctx.strokeStyle = palette.accent;
+  ctx.globalAlpha = 0.4;
+  ctx.lineWidth = 1.6;
+  ctx.stroke();
+
+  ctx.globalAlpha = 0.85;
+  ctx.fillStyle = palette.accent;
+  ctx.font = "700 10px var(--font-geist-mono), monospace";
+  ctx.textAlign = "center";
+  ctx.fillText("Tab", target.position.x, target.position.y - target.radius - 14);
+  ctx.restore();
+}
+
+function drawTracers(ctx: CanvasRenderingContext2D, game: GameState) {
+  for (const tracer of game.tracers) {
+    const alpha = Math.max(0, tracer.life / tracer.maxLife);
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = tracer.tab ? palette.powerup : palette.accent;
+    ctx.lineWidth = tracer.tab ? 3 : 1.5;
+    ctx.beginPath();
+    ctx.moveTo(tracer.from.x, tracer.from.y);
+    ctx.lineTo(tracer.to.x, tracer.to.y);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function drawAgentDrone(ctx: CanvasRenderingContext2D, game: GameState, now: number) {
+  const agent = game.agent;
+  if (!agent) {
+    return;
+  }
+
+  ctx.save();
+  agent.trail.forEach((point, index) => {
+    ctx.globalAlpha = (index / Math.max(1, agent.trail.length)) * 0.35;
+    ctx.fillStyle = palette.powerup;
+    ctx.beginPath();
+    ctx.arc(point.x, point.y, 3, 0, TWOPI);
+    ctx.fill();
+  });
+  ctx.globalAlpha = 1;
+  ctx.translate(agent.position.x, agent.position.y);
+  ctx.rotate(now * 4);
+  ctx.beginPath();
+  ctx.moveTo(0, -9);
+  ctx.lineTo(8, 7);
+  ctx.lineTo(-8, 7);
+  ctx.closePath();
+  ctx.fillStyle = palette.powerup;
+  ctx.fill();
   ctx.restore();
 }
 
@@ -887,7 +1392,7 @@ function drawHud(ctx: CanvasRenderingContext2D, game: GameState, now: number) {
   ctx.fillStyle = palette.ink;
   ctx.font = "700 13px var(--font-geist-mono), monospace";
   ctx.fillText(`IMPACT ${Math.max(0, Math.round(game.score)).toString().padStart(5, "0")}`, 22, 30);
-  ctx.fillText(`TRUST ${game.lives}`, 22, 52);
+  ctx.fillText(`TRUST ${Math.max(0, Math.round(game.trust))}/100`, 22, 52);
   ctx.textAlign = "right";
   ctx.fillText(`PHASE ${Math.min(game.level, CAMPAIGN_PHASES)}/${CAMPAIGN_PHASES}`, game.width - 22, 30);
   ctx.font = "600 12px var(--font-geist-sans), Arial, sans-serif";
@@ -912,6 +1417,36 @@ function drawHud(ctx: CanvasRenderingContext2D, game: GameState, now: number) {
   ctx.restore();
 }
 
+function drawWaveIntro(ctx: CanvasRenderingContext2D, game: GameState, now: number) {
+  if (game.status !== "playing" || now >= game.waveIntroUntil) {
+    return;
+  }
+  const remaining = game.waveIntroUntil - now;
+  const elapsed = WAVE_INTRO_DURATION - remaining;
+  const fadeIn = clamp(elapsed / 0.25, 0, 1);
+  const fadeOut = clamp(remaining / 0.4, 0, 1);
+  const alpha = Math.min(fadeIn, fadeOut);
+  const brief = waveBriefForLevel(game.level);
+  const [name, rest] = brief.split("—").map((part) => part.trim());
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.textAlign = "center";
+  ctx.fillStyle = palette.ink;
+  ctx.font = "800 26px var(--font-geist-sans), Arial, sans-serif";
+  ctx.fillText(
+    `PHASE ${Math.min(game.level, CAMPAIGN_PHASES)} — ${(name ?? brief).toUpperCase()}`,
+    game.width / 2,
+    game.height / 2 - 60,
+  );
+  if (rest) {
+    ctx.font = "600 14px var(--font-geist-sans), Arial, sans-serif";
+    ctx.fillStyle = palette.muted;
+    ctx.fillText(rest, game.width / 2, game.height / 2 - 34);
+  }
+  ctx.restore();
+}
+
 function drawOverlay(ctx: CanvasRenderingContext2D, game: GameState) {
   if (game.status === "playing") {
     return;
@@ -922,17 +1457,21 @@ function drawOverlay(ctx: CanvasRenderingContext2D, game: GameState) {
       ? "Clear AI adoption blockers"
       : game.status === "paused"
         ? "Paused"
-        : game.status === "missionComplete"
-          ? "Mission complete"
-          : "Run ended";
+        : game.status === "debriefing"
+          ? "Phase retro"
+          : game.status === "missionComplete"
+            ? "Mission complete"
+            : "Run ended";
   const subtitle =
     game.status === "ready"
       ? "Four phases. Real powerups. Then prove it in the builder challenge."
       : game.status === "paused"
         ? "Press P or Resume to continue."
-        : game.status === "missionComplete"
-          ? "Fork one blocker and show how you would help a team adopt Cursor."
-          : "Review your scorecard, then take the builder challenge.";
+        : game.status === "debriefing"
+          ? `Phase ${game.debriefPhase}: ${WAVE_BRIEFS[Math.max(0, game.debriefPhase - 1)] ?? "Reflect"} — answer below to continue.`
+          : game.status === "missionComplete"
+            ? "Fork one blocker and show how you would help a team adopt Cursor."
+            : "Review your scorecard, then take the builder challenge.";
 
   ctx.save();
   ctx.fillStyle = palette.overlay;
@@ -948,6 +1487,15 @@ function drawOverlay(ctx: CanvasRenderingContext2D, game: GameState) {
 }
 
 export function drawGame(ctx: CanvasRenderingContext2D, game: GameState, now: number) {
+  ctx.save();
+  if (now < game.shakeUntil && game.shakeDuration > 0) {
+    const remaining = game.shakeUntil - now;
+    const factor = clamp(remaining / game.shakeDuration, 0, 1);
+    const dx = (Math.random() * 2 - 1) * game.shakeStrength * factor;
+    const dy = (Math.random() * 2 - 1) * game.shakeStrength * factor;
+    ctx.translate(dx, dy);
+  }
+
   drawBackground(ctx, game);
 
   for (const particle of game.particles) {
@@ -968,36 +1516,61 @@ export function drawGame(ctx: CanvasRenderingContext2D, game: GameState, now: nu
   }
 
   for (const asteroid of game.asteroids) {
-    drawAsteroid(ctx, asteroid, now);
+    drawAsteroid(ctx, game, asteroid, now);
   }
+
+  drawSuggestion(ctx, game, now);
+  drawTracers(ctx, game);
 
   for (const powerup of game.powerups) {
     drawPowerup(ctx, powerup, now);
   }
 
+  drawAgentDrone(ctx, game, now);
   drawShip(ctx, game, now);
   drawHud(ctx, game, now);
+  drawWaveIntro(ctx, game, now);
   drawOverlay(ctx, game);
+
+  ctx.restore();
 }
 
 export function startMission(game: GameState, now: number) {
   game.status = "playing";
   game.score = 0;
-  game.lives = INITIAL_LIVES;
+  game.trust = TRUST_START;
   game.level = 1;
   game.shots = 0;
   game.hits = 0;
+  game.missStreak = 0;
   game.nearMisses = 0;
+  game.tabAccepts = 0;
+  game.conversions = 0;
+  game.agentDeploys = 0;
   game.blockersCleared = {};
   game.powerupsCollected = 0;
   game.powerupsUsedWell = 0;
   game.bullets = [];
+  game.tracers = [];
   game.particles = [];
   game.powerups = [];
   game.effects = emptyEffects();
-  game.keys.clear();
+  game.agent = null;
+  game.debriefs = [];
+  game.debriefPhase = 0;
+  game.pendingMissionComplete = false;
+  game.suggestionTargetId = null;
+  game.waveModifier = null;
+  game.waveModifierLabel = null;
+  game.shakeUntil = 0;
+  game.shakeDuration = 0;
+  game.shakeStrength = 0;
+  game.hitStopUntil = 0;
+  game.thrusting = false;
+  game.lastTabAcceptAt = 0;
   game.toast = waveBriefForLevel(1);
   game.toastUntil = now + 2.4;
+  game.waveIntroUntil = now + WAVE_INTRO_DURATION;
   resetShip(game, now);
   spawnWave(game);
 }
